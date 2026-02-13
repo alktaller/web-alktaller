@@ -279,8 +279,8 @@ function renderTimeline() {
           `;
       } else {
           // Maintenance logic
-          let garageHtml = e.garage ? `<br><small>🏪 ${e.garage}</small>` : "";
-          let ticketHtml = e.ticket ? `<a href="${e.ticket}" target="_blank" style="text-decoration:none; margin-left:10px;">📄 Ver Ticket</a>` : "";
+          let garageHtml = e.garage ? `<div style="margin-top:4px; font-style:italic; color:#444;">📍 ${e.garage}</div>` : "";
+          let ticketHtml = e.ticket ? `<div style="margin-top:2px;"><a href="${e.ticket}" target="_blank" style="text-decoration:none; color: #E91E63; font-weight:bold;">📄 Ver Ticket</a></div>` : "";
           
           detailsDiv.innerHTML = `
             <strong>${e.date}</strong> — ${e.maintType}<br>
