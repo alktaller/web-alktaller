@@ -53,7 +53,18 @@ async function loadData() {
   if (!res.ok) return { vehicles: [] };
   const file = await res.json();
   githubSha = file.sha;
-  return JSON.parse(atob(file.content.replace(/\n/g, "")));
+  
+  try {
+    // Decodificar Base64 soportando caracteres UTF-8 (emojis, acentos)
+    // El proceso inverso a btoa(unescape(encodeURIComponent(str))) es:
+    const rawContent = file.content.replace(/\n/g, "");
+    const decodedContent = decodeURIComponent(escape(window.atob(rawContent)));
+    return JSON.parse(decodedContent);
+  } catch (e) {
+    console.error("Error al parsear el fichero JSON de GitHub", e);
+    alert("Error: El archivo de datos en GitHub parece estar corrupto o tiene un formato inválido.");
+    return { vehicles: [] };
+  }
 }
 
 async function saveData(data) {
