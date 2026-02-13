@@ -13,26 +13,10 @@
   <div class="login-container">
     <img src="images/logo.png" alt="AlkTaller Logo" class="login-logo">
     <h2>Bienvenido a AlkTaller</h2>
-    <p>Para gestionar tus datos de forma segura sin servidores, necesitamos un Token de GitHub.</p>
+    <p>Introduce tu Token de Acceso para desbloquear tus datos.</p>
     
-    <div class="input-group-vertical">
-      <a href="https://github.com/settings/tokens/new?scopes=repo&description=AlkTaller%20Web%20App" target="_blank" class="btn-secondary btn-full">
-        🔑 Generar Token Automáticamente
-      </a>
-      <p class="tiny-text">(Te abrirá GitHub. Baja al final, pulsa "Generate token" y pégalo abajo)</p>
-    </div>
-
-    <div class="input-group-vertical" style="text-align: left; margin-bottom: 1rem;">
-       <label for="repoUser" style="font-size: 0.85rem; font-weight: bold;">Dueño del Repositorio (Usuario/Org)</label>
-       <input type="text" id="repoUser" placeholder="Ej: alktaller">
-       
-       <label for="repoName" style="font-size: 0.85rem; font-weight: bold; margin-top: 0.5rem;">Nombre del Repositorio de Datos</label>
-       <input type="text" id="repoName" placeholder="Ej: mis-datos-coche">
-       <p class="tiny-text" style="color: #4a5568;">Si usas una Organización, pon su nombre arriba.</p>
-    </div>
-
     <div class="input-group">
-      <input type="password" id="githubTokenInput" placeholder="Pega aquí tu token (ghp_...)">
+      <input type="password" id="githubTokenInput" placeholder="ghp_...">
       <button onclick="handleLogin()" class="btn-primary">Entrar</button>
     </div>
   </div>
@@ -64,6 +48,40 @@
     </section>
 
     <div class="forms-grid">
+      <!-- Sección Información del Vehículo -->
+      <section class="card" style="grid-column: 1 / -1;">
+        <h2>🚗 Información del Vehículo</h2>
+        <div class="form-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div>
+            <label>Matrícula</label>
+            <input id="infoPlate" type="text" placeholder="0000 XXX" onchange="updateVehicleInfo('plate', this.value)">
+          </div>
+          <div>
+            <label>VIN (Bastidor)</label>
+            <input id="infoVin" type="text" placeholder="VIN..." onchange="updateVehicleInfo('vin', this.value)">
+          </div>
+          <div>
+            <label>Fecha Matriculación</label>
+            <input id="infoRegDate" type="date" onchange="updateVehicleInfo('regDate', this.value)">
+          </div>
+          <div>
+            <label>Fecha Compra</label>
+            <input id="infoPurchaseDate" type="date" onchange="updateVehicleInfo('purchaseDate', this.value)">
+          </div>
+          <div>
+            <label>Kilometraje Actual</label>
+            <div style="display: flex; gap: 5px;">
+              <input id="infoOdo" type="number" placeholder="km" onchange="updateVehicleOdometer(this.value)">
+              <button onclick="updateVehicleOdometer(document.getElementById('infoOdo').value)" class="btn-secondary" title="Actualizar">💾</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-group mt-2">
+           <label>Notas</label>
+           <textarea id="infoNotes" style="width:100%; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px;" rows="2" placeholder="Notas adicionales..." onchange="updateVehicleInfo('notes', this.value)"></textarea>
+        </div>
+      </section>
+
       <section class="card">
         <h2>⛽ Nuevo repostaje</h2>
         <div class="form-group">
@@ -95,7 +113,7 @@
             <tr>
               <th>Título</th>
               <th>Frecuencia (km)</th>
-              <th>Frecuencia (días)</th>
+              <th>Tiempo</th>
               <th>Acciones</th>
             </tr>
           </thead>

@@ -1,51 +1,16 @@
-// Configuración por defecto (fallback)
-const DEFAULT_USER = "alktaller";
-const DEFAULT_REPO = "web-alktaller";
+// Configuración Fija
+const GITHUB_USER = "alktaller";
+const GITHUB_REPO = "mis-datos-coche";
 const GITHUB_PATH = "data/car-data.json";
 
 let githubSha = null;
-
-// Funciones para obtener configuración desde Session/URL/Defaults
-function getGithubUser() { 
-  return sessionStorage.getItem("githubUser") || DEFAULT_USER; 
-}
-
-function getGithubRepo() { 
-  return sessionStorage.getItem("githubRepo") || DEFAULT_REPO; 
-}
 
 function getToken() { return sessionStorage.getItem("githubToken"); }
 function setToken(token) { sessionStorage.setItem("githubToken", token); }
 
 function logout() { 
   sessionStorage.removeItem("githubToken"); 
-  sessionStorage.removeItem("githubUser"); 
-  sessionStorage.removeItem("githubRepo"); 
   location.reload(); 
-}
-
-// Intentar autodetectar repositorio desde la URL (para GitHub Pages)
-function autoDetectConfig() {
-  const host = window.location.hostname; // ej: usuario.github.io
-  const path = window.location.pathname; // ej: /web-alktaller/
-  
-  if (host.includes("github.io")) {
-    const user = host.split(".")[0];
-    const repo = path.split("/")[1] || ""; // puede ser vacio si es root
-    
-    if (user && repo) {
-      document.getElementById("repoUser").value = user;
-      document.getElementById("repoName").value = repo;
-    }
-  } else {
-     // Localhost o dominio custom: Usemos los defaults
-     document.getElementById("repoUser").value = DEFAULT_USER;
-     document.getElementById("repoName").value = DEFAULT_REPO;
-  }
-  
-  // Si ya hay valores en session, ponerlos en los inputs
-  if(sessionStorage.getItem("githubUser")) document.getElementById("repoUser").value = sessionStorage.getItem("githubUser");
-  if(sessionStorage.getItem("githubRepo")) document.getElementById("repoName").value = sessionStorage.getItem("githubRepo");
 }
 
 async function validateToken(token) {
@@ -62,19 +27,15 @@ async function validateToken(token) {
 // UI Handler for Login Button
 async function handleLogin() {
   const input = document.getElementById("githubTokenInput");
-  const userParam = document.getElementById("repoUser").value.trim();
-  const repoParam = document.getElementById("repoName").value.trim();
   const token = input.value.trim();
   
-  if(!token || !userParam || !repoParam) { alert("Rellena todos los campos (Usuario, Repo y Token)"); return; }
+  if(!token) { alert("Introduce el token"); return; }
   
   const valid = await validateToken(token);
-  if(!valid) { alert("Token inválido. Comprueba que lo has copiado bien."); return; }
+  if(!valid) { alert("Token inválido."); return; }
   
   // Guardamos configuración
   setToken(token);
-  sessionStorage.setItem("githubUser", userParam);
-  sessionStorage.setItem("githubRepo", repoParam);
   
   document.getElementById("login-screen").classList.add("hidden");
   document.getElementById("app-container").classList.remove("hidden");
@@ -86,21 +47,18 @@ async function loadData() {
   const token = getToken();
   if (!token) throw new Error("No authorized");
   
-  const user = getGithubUser();
-  const repo = getGithubRepo();
-  const url = `https://api.github.com/repos/${user}/${repo}/contents/${GITHUB_PATH}`;
+  const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
   
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } });
   
   if (res.status === 401) {
-    alert("Sesión expirada o sin permisos");
+    alert("Token expirado o sin permisos para acceder al repositorio privado.");
     logout();
     return { vehicles: [] };
   }
   
   if (res.status === 404) {
-      // Puede ser que el archivo no exista (vehiculos vacios) O que el repo no exista.
-      // Asumiremos que es vehiculos vacios para permitir creación.
+      // Repositorio privado existe pero el archivo no (primera vez)
       console.warn("Archivo data no encontrado (404), iniciando app vacía.");
       return { vehicles: [] };
   }
@@ -122,9 +80,7 @@ async function loadData() {
 
 async function saveData(data) {
   const token = getToken();
-  const user = getGithubUser();
-  const repo = getGithubRepo();
-  const url = `https://api.github.com/repos/${user}/${repo}/contents/${GITHUB_PATH}`;
+  const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
   
   const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
   
@@ -147,7 +103,7 @@ async function saveData(data) {
     if (!res.ok) {
        const err = await res.json().catch(()=>({}));
        console.error("Error GitHub:", err);
-       alert(`Error al guardar en ${user}/${repo}: ${err.message || res.statusText}`); 
+       alert(`Error al guardar: ${err.message || res.statusText}`); 
        return; 
     }
     
@@ -162,10 +118,4 @@ async function saveData(data) {
   }
 }
 
-// Init Check
-document.addEventListener("DOMContentLoaded", ()=>{
-   // Si estamos en la pantalla de login, intentar autodetectar
-   if(!getToken()) {
-       autoDetectConfig();
-   }
-});
+// Init Check -> No necesitamos autodetect config

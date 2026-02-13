@@ -63,27 +63,40 @@ async function main() {
       if(!r.lastOdometer) r.lastOdometer = 0;
       if(!r.lastDate && r.intervalDays) r.lastDate = new Date().toISOString(); 
 
-      // 1. Trigger por km (si se ha configurado intervalo y hemos recorrido suficiente desde la ultima vez)
+      // 1. Trigger por km (ahora usando currentOdometer global si existe)
       if(r.intervalKm && r.intervalKm > 0){
-        // Distancia recorrida desde el último mantenimiento/aviso
-        const distRecorrida = currentKm - r.lastOdometer;
-        // Si falta poco para llegar al intervalo (ej: aviso 500km antes) o nos hemos pasado
+        // Preferimos el odómetro global del coche, sino el calculado
+        const currentRealKm = vehicle.currentOdometer || currentKm; 
+        
+        const distRecorrida = currentRealKm - r.lastOdometer;
         const margenAviso = 500; 
         
-        // Logica simplificada: Si estamos cerca del target
         if (distRecorrida >= (r.intervalKm - margenAviso)) {
            trigger = true;
-           // Fecha estimada: mañana
            eventDate.setDate(today.getDate()+1);
         }
       }
 
-      // 2. Trigger por fecha (dias)
-      if(r.intervalDays && r.intervalDays > 0 && r.lastDate){
-        const lastDate = new Date(r.lastDate);
-        const diffDays = Math.floor((today.getTime() - lastDate.getTime())/(1000*60*60*24));
-        
-        if(diffDays >= r.intervalDays){ 
+      // 2. Trigger por fecha (dias, meses o años)
+      let diffDays = -1;
+      
+      if (r.lastDate) {
+         const lastDate = new Date(r.lastDate);
+         diffDays = Math.floor((today.getTime() - lastDate.getTime())/(1000*60*60*24));
+      }
+      
+      let intervalDaysCalc = 0;
+      
+      if (r.intervalYears) {
+          intervalDaysCalc = r.intervalYears * 365;
+      } else if (r.intervalMonths) {
+          intervalDaysCalc = r.intervalMonths * 30; // aprox
+      } else if (r.intervalDays) {
+          intervalDaysCalc = r.intervalDays;
+      }
+
+      if(intervalDaysCalc > 0 && diffDays >= 0){
+        if(diffDays >= intervalDaysCalc){ 
           trigger=true; 
           eventDate=today; 
         }
@@ -121,8 +134,8 @@ async function main() {
 
       // Actualizamos JSON para evitar que vuelva a dispararse mañana mismo
       // Reseteamos el contador "last" al estado actual
-      if(r.intervalKm) r.lastOdometer = currentKm;
-      if(r.intervalDays) r.lastDate = today.toISOString();
+      if(r.intervalKm) r.lastOdometer = vehicle.currentOdometer || currentKm;
+      if(r.intervalDays || r.intervalMonths || r.intervalYears) r.lastDate = today.toISOString();
       
       fileChanged = true;
     }

@@ -20,7 +20,13 @@ async function start() {
   init();
 }
 
-function init(){ renderVehicleSelect(); renderTimeline(); renderReminders(); renderStats(); }
+function init(){ 
+  renderVehicleSelect(); 
+  renderVehicleInfo(); // Nueva función
+  renderTimeline(); 
+  renderReminders(); 
+  renderStats(); 
+}
 
 function renderVehicleSelect() {
   const select=document.getElementById("vehicleSelect"); select.innerHTML="";
@@ -29,8 +35,65 @@ function renderVehicleSelect() {
   
   select.onchange=()=>{ 
       currentVehicle=data.vehicles.find(v=>v.id===select.value); 
+      renderVehicleInfo(); // Actualizar info al cambiar coche
       renderTimeline(); renderReminders(); renderStats(); 
   };
+}
+
+// --- NUEVA LÓGICA DE INFORMACIÓN DE VEHÍCULO ---
+
+function renderVehicleInfo() {
+  if(!currentVehicle) return;
+  
+  // Rellenar campos, usando string vacio si no existen
+  document.getElementById("infoPlate").value = currentVehicle.plate || "";
+  document.getElementById("infoVin").value = currentVehicle.vin || "";
+  document.getElementById("infoRegDate").value = currentVehicle.regDate || "";
+  document.getElementById("infoPurchaseDate").value = currentVehicle.purchaseDate || "";
+  document.getElementById("infoNotes").value = currentVehicle.notes || "";
+  
+  // Kilometraje: Si no tiene campo propio, usamos el calculado, y lo guardamos
+  if (currentVehicle.currentOdometer === undefined) {
+      currentVehicle.currentOdometer = calculateMaxOdometer();
+  }
+  document.getElementById("infoOdo").value = currentVehicle.currentOdometer;
+}
+
+async function updateVehicleInfo(field, value) {
+  if(!currentVehicle) return;
+  currentVehicle[field] = value;
+  await saveData(data);
+}
+
+async function updateVehicleOdometer(value) {
+  if(!currentVehicle) return;
+  const newOdo = Number(value);
+  if(isNaN(newOdo)) { alert("Kilometraje inválido"); return; }
+  
+  // Validar lógica básica? (no permitir bajar km salvo error?) -> Dejamos libre por si corrección de error
+  currentVehicle.currentOdometer = newOdo;
+  await saveData(data);
+  renderStats(); // Los stats pueden cambiar si el odometro actual es la referencia
+}
+
+function calculateMaxOdometer() {
+    // Busca el máximo entre fuel, maintenance y el propio currentOdometer
+    if(!currentVehicle) return 0;
+    
+    let max = currentVehicle.currentOdometer || 0;
+    
+    currentVehicle.fuelEntries.forEach(e => { if(e.odometer > max) max = e.odometer; });
+    currentVehicle.maintenanceEntries.forEach(e => { if(e.odometer > max) max = e.odometer; });
+    
+    return max;
+}
+
+// Función auxiliar para actualizar odómetro automáticamente desde entradas
+function checkAndUpdateOdometer(newKm) {
+    if(!currentVehicle.currentOdometer || newKm > currentVehicle.currentOdometer) {
+        currentVehicle.currentOdometer = newKm;
+        document.getElementById("infoOdo").value = newKm;
+    }
 }
 
 async function addVehicle(isFirst = false) {
@@ -72,6 +135,7 @@ async function addFuel() {
   };
   
   currentVehicle.fuelEntries.push(entry); 
+  checkAndUpdateOdometer(entry.odometer); // Auto-actualizar KMs globales
   
   // Limpiar formulario
   dateEl.value = ""; odoEl.value = ""; litersEl.value = ""; costEl.value = "";
@@ -99,6 +163,7 @@ async function addMaintenance() {
   };
   
   currentVehicle.maintenanceEntries.push(entry); 
+  checkAndUpdateOdometer(entry.odometer); // Auto-actualizar KMs globales
   
    // Limpiar formulario
    dateEl.value = ""; typeEl.value = ""; odoEl.value = ""; costEl.value = "";
@@ -126,28 +191,33 @@ function renderStats() {
   div.innerHTML = "";
   if(!currentVehicle) return;
   
+  // Usamos el odometro actual global como referencia final si existe
+  const currentTotalKm = currentVehicle.currentOdometer || calculateMaxOdometer();
+  
   const fuels=[...currentVehicle.fuelEntries].sort((a,b)=>a.odometer-b.odometer);
-  if(fuels.length<2){ div.textContent="No hay datos suficientes (min 2 repostajes)."; return; }
+  if(fuels.length<2){ 
+      div.innerHTML = `<p>KM Actuales: <b>${currentTotalKm} km</b></p><p>Faltan datos de repostaje para calcular consumos.</p>`; 
+      return; 
+  }
   
   let liters=0, cost=0; 
-  // Calcular consumo entre el primer y ultimo repostaje
-  // Excluimos el primer llenado para el calculo de consumo si queremos ser estrictos (metodo lleno-lleno), 
-  // pero para simplificar sumamos todo y dividimos por km totales recorridos en ese periodo.
-  // Mejor aproximación simple: (Litros totales / KM totales) * 100
-  
   fuels.forEach(f=>{ liters+=f.liters; cost+=f.totalCost; });
-  const km=fuels[fuels.length-1].odometer-fuels[0].odometer; 
   
-  if(km <= 0) { div.textContent="Error en datos de kilometraje."; return; }
+  // Distancia recorrida (usando repostajes para calculo de consumo promedio real)
+  const kmWindow = fuels[fuels.length-1].odometer - fuels[0].odometer; 
   
-  const consumo=(liters/km)*100; 
-  const costKm=cost/km;
+  let html = `<p>Kilometraje Actual: <b>${currentTotalKm} km</b></p>`;
   
-  div.innerHTML=`
-    <p>Distancia registrada: <b>${km} km</b></p>
-    <p>Consumo medio: <b>${consumo.toFixed(2)} L/100km</b></p>
-    <p>Coste por km: <b>${costKm.toFixed(3)} €/km</b></p>
-  `;
+  if(kmWindow > 0) {
+      const consumo=(liters/kmWindow)*100; 
+      const costKm=cost/kmWindow;
+      html += `
+        <p>Consumo medio (histórico): <b>${consumo.toFixed(2)} L/100km</b></p>
+        <p>Coste por km (combustible): <b>${costKm.toFixed(3)} €/km</b></p>
+      `;
+  }
+  
+  div.innerHTML=html;
 }
 
 // ---------------- RECORDATORIOS EDITABLES ----------------
@@ -156,11 +226,33 @@ function renderReminders(){
   if(!currentVehicle) return;
 
   currentVehicle.reminders.forEach((r,index)=>{
+    // Retrocompatibilidad: convertir intervalDays a visualización Meses (aprox) si no tiene unit
+    let timeVal = 0;
+    let timeUnit = 'months'; // default
+    
+    if (r.intervalMonths) {
+       timeVal = r.intervalMonths;
+       timeUnit = 'months';
+    } else if (r.intervalYears) {
+       timeVal = r.intervalYears;
+       timeUnit = 'years';
+    } else if (r.intervalDays) {
+       // Si es legacy data en dias, convertimos visualmente a meses
+       timeVal = Math.round(r.intervalDays / 30);
+       timeUnit = 'months';
+    }
+
     const tr=document.createElement("tr");
     tr.innerHTML=`
       <td><input type="text" value="${r.title}" onchange="updateReminder(${index},'title',this.value)"></td>
-      <td><input type="number" value="${r.intervalKm}" onchange="updateReminder(${index},'intervalKm',this.value)"></td>
-      <td><input type="number" value="${r.intervalDays||''}" onchange="updateReminder(${index},'intervalDays',this.value)"></td>
+      <td><input type="number" value="${r.intervalKm}" onchange="updateReminder(${index},'intervalKm',this.value)" style="width: 80px"> km</td>
+      <td style="display:flex; gap:5px;">
+        <input type="number" value="${timeVal}" onchange="updateReminderTime(${index}, this.value, document.getElementById('unit_${index}').value)" style="width: 60px">
+        <select id="unit_${index}" onchange="updateReminderTime(${index}, this.previousElementSibling.value, this.value)">
+           <option value="months" ${timeUnit==='months'?'selected':''}>Meses</option>
+           <option value="years" ${timeUnit==='years'?'selected':''}>Años</option>
+        </select>
+      </td>
       <td><button onclick="deleteReminder(${index})" class="btn-danger">❌</button></td>
     `;
     tbody.appendChild(tr);
@@ -168,12 +260,39 @@ function renderReminders(){
 }
 
 function addReminder(){ 
-  const r={ title:"Nuevo mantenimiento", intervalKm:0, intervalDays:0, lastOdometer:0, lastDate:null };
+  const r={ title:"Nuevo mantenimiento", intervalKm:0, intervalMonths:0, lastOdometer:0, lastDate:null };
   currentVehicle.reminders.push(r); renderReminders(); saveData(data);
 }
 
+// Helper especial para cambiar tiempo/unidad y guardarlo en el formato correcto
+// Guardamos siempre como "intervalMonths" en el JSON para estandarizar en Backend, 
+// o intervalDays si queremos maxima compatibilidad, pero el usuario pidió MESES/AÑOS.
+// Voy a guardar: intervalMonths (borrando intervalDays viejo para limpiar)
+function updateReminderTime(index, value, unit) {
+   const val = Number(value);
+   const r = currentVehicle.reminders[index];
+   
+   // Limpiamos propiedades antiguas para no confundir
+   delete r.intervalDays;
+   delete r.intervalYears;
+   
+   if (unit === 'years') {
+       r.intervalMonths = val * 12; // Guardamos todo en meses internamente
+       // Guardamos una flag visual o re-calculamos al renderizar?
+       // Mejor guardamos la propiedad intervalYears si el usuario quiere "Años" para mantener su preferencia visual?
+       // No, mejor normalizamos a months para lógica backend, y en render dividimos si es mult de 12.
+       // Pero para cumplir con la petición de "store as months/years params", voy a guardar la propiedad especifica.
+       r.intervalYears = val;
+       delete r.intervalMonths; 
+   } else {
+       r.intervalMonths = val;
+   }
+   
+   saveData(data);
+}
+
 function updateReminder(index,field,value){
-  if(field==='intervalKm'||field==='intervalDays') value=Number(value);
+  if(field==='intervalKm') value=Number(value);
   currentVehicle.reminders[index][field]=value; saveData(data);
 }
 
