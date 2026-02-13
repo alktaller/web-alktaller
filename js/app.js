@@ -44,10 +44,22 @@ async function start() {
 function init(){ 
   renderCategoriesDatalist();
   renderVehicleSelect(); 
+  // Load Settings
+  if(data.settings && data.settings.ntfyTopic) {
+      const el = document.getElementById("configNtfy");
+      if(el) el.value = data.settings.ntfyTopic;
+  }
+  
   renderVehicleInfo(); // Nueva función
   renderTimeline(); 
   renderReminders(); 
   renderStats(); 
+}
+
+function updateSettings(key, value) {
+    if(!data.settings) data.settings = {};
+    data.settings[key] = value.trim();
+    saveData(data);
 }
 
 function renderCategoriesDatalist() {
