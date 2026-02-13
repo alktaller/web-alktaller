@@ -430,40 +430,58 @@ function deleteReminder(index){
   currentVehicle.reminders.splice(index,1); renderReminders(); saveData(data);
 }
 
-// Expose start to global scope so storage.js or login flow can call it
+// Expose start to global scope
 window.startApp = start;
 
-// Initial check
+// --- UI TABS LOGIC ---
+window.openTab = function(tabId) {
+    // Ocultar todos los contenidos
+    const contents = document.querySelectorAll('.tab-content');
+    contents.forEach(el => {
+        el.style.display = 'none';
+        el.classList.remove('active');
+    });
+    
+    // Desactivar todos los botones
+    const btns = document.querySelectorAll('.tab-btn');
+    btns.forEach(btn => btn.classList.remove('active'));
+    
+    // Mostrar el contenido seleccionado
+    const target = document.getElementById(tabId);
+    if (target) {
+        target.style.display = 'block';
+        // Pequeño timeout para permitir transición CSS si existiera
+        setTimeout(() => target.classList.add('active'), 0);
+    }
+    
+    // Activar el botón correspondiente
+    // Buscamos el botón que tenga el onclick apuntando a este tabId
+    btns.forEach(btn => {
+        const onClickAttr = btn.getAttribute('onclick');
+        if (onClickAttr && onClickAttr.includes(`'${tabId}'`)) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// Initial check & Boot
 (async function boot() {
   const token = sessionStorage.getItem("githubToken");
   if(token) {
-    // Basic UI switch, validation happens in loadData or we let it fail
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("app-container").classList.remove("hidden");
-    // Esperar a que cargue el DOM
+    
     if (document.readyState === 'loading') {
-       document.addEventListener('DOMContentLoaded', start);
+       document.addEventListener('DOMContentLoaded', () => {
+           start();
+           // Open default tab
+           window.openTab('dashboard');
+       });
     } else {
        await start();
+       window.openTab('dashboard');
     }
   } else {
     document.getElementById("login-screen").classList.remove("hidden");
   }
 })();
-
-/* --- UI TABS LOGIC --- */
-function openTab(tabId) {
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    
-    const target = document.getElementById(tabId);
-    if(target) target.classList.add('active');
-    
-    // Highlight button
-    const btns = document.querySelectorAll('.tab-btn');
-    for (const btn of btns) {
-        if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabId)) {
-            btn.classList.add('active');
-        }
-    }
-}
