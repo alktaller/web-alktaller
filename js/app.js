@@ -1166,13 +1166,46 @@ async function exportVehiclePDF() {
   doc.setTextColor(60);
   doc.text(`${currentVehicle.brand || ''} ${currentVehicle.model || 'Vehículo'} (${currentVehicle.plate || 'S/M'})`, pageWidth/2, 30, { align: 'center' });
 
+  let yPos = 35;
+
+  // --- IMAGE (New) ---
+  const imgEl = document.getElementById("vehiclePhotoImg");
+  if (imgEl && imgEl.src && imgEl.style.display !== 'none' && imgEl.naturalWidth > 0) {
+      try {
+          // Draw to canvas to extract Base64 Data
+          const canvas = document.createElement("canvas");
+          canvas.width = imgEl.naturalWidth;
+          canvas.height = imgEl.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(imgEl, 0, 0);
+          
+          const imgData = canvas.toDataURL('image/jpeg', 0.75); // Compress slightly
+          
+          // Calculate Aspect Ratio
+          const imgRatio = imgEl.naturalHeight / imgEl.naturalWidth;
+          const pdfImgWidth = 80; // Sentral width mm
+          const pdfImgHeight = pdfImgWidth * imgRatio;
+          
+          // Center Image
+          const xImg = (pageWidth - pdfImgWidth) / 2;
+          
+          doc.addImage(imgData, 'JPEG', xImg, yPos + 5, pdfImgWidth, pdfImgHeight);
+          yPos += pdfImgHeight + 15; // Advance cursor
+          
+      } catch(e) {
+          console.warn("Error embedding image in PDF:", e);
+      }
+  } else {
+      yPos += 5; // Little spacing if no image
+  }
+
   // --- INFO BLOCK ---
   doc.setFontSize(12);
   doc.setTextColor(0);
   doc.setDrawColor(200);
-  doc.line(14, 35, pageWidth-14, 35);
+  doc.line(14, yPos, pageWidth-14, yPos);
 
-  let yPos = 45;
+  yPos += 10;
   const leftX = 14;
   const rightX = pageWidth / 2 + 10;
   
