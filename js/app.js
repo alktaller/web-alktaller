@@ -908,22 +908,6 @@ function updateReminderTime(index, value, unit) {
    renderReminders();
    saveData(data);
 }
-   delete r.intervalYears;
-   
-   if (unit === 'years') {
-       r.intervalMonths = val * 12; // Guardamos todo en meses internamente
-       // Guardamos una flag visual o re-calculamos al renderizar?
-       // Mejor guardamos la propiedad intervalYears si el usuario quiere "Años" para mantener su preferencia visual?
-       // No, mejor normalizamos a months para lógica backend, y en render dividimos si es mult de 12.
-       // Pero para cumplir con la petición de "store as months/years params", voy a guardar la propiedad especifica.
-       r.intervalYears = val;
-       delete r.intervalMonths; 
-   } else {
-       r.intervalMonths = val;
-   }
-   
-   saveData(data);
-}
 
 function updateReminder(index,field,value){
   if(field==='intervalKm') value=Number(value);
