@@ -94,6 +94,11 @@
             <label>Tema Ntfy.sh (Notificaciones)</label>
             <input id="configNtfy" type="text" placeholder="ej: mi-coche-secret-topic" onchange="updateSettings('ntfyTopic', this.value)">
             <small style="color:#64748b; font-size:0.8rem;">Escribe el nombre de tu tema (topic) de ntfy.sh para recibir alertas diarias.</small>
+            
+            <button id="btnTestNtfy" onclick="testNotifications()" class="btn-secondary" style="margin-top:15px; font-size:0.9rem; width:100%;">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                Lanzar Prueba de Notificación
+            </button>
           </div>
         </section>
 

@@ -62,6 +62,55 @@ function updateSettings(key, value) {
     saveData(data);
 }
 
+async function testNotifications() {
+    // 1. Get Token
+    const token = sessionStorage.getItem("githubToken");
+    if (!token) {
+        alert("Error: No hay token de sesión. Recarga la página.");
+        return;
+    }
+
+    // 2. Confirm
+    if(!confirm("Esto lanzará una prueba de notificaciones AHORA MISMO. \n\nAsegúrate de haber guardado el Topic primero.\n¿Continuar?")) return;
+
+    // 3. Call GitHub API to dispatch workflow
+    try {
+        const btn = document.getElementById('btnTestNtfy');
+        if(btn) {
+            btn.innerHTML = "Lanzando... ⏳";
+            btn.disabled = true;
+        }
+
+        const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/actions/workflows/reminders.yml/dispatches`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ref: 'main' // Branch to run
+            })
+        });
+
+        if (res.ok) {
+            alert("✅ Prueba lanzada correctamente.\n\nRecibirás la notificación en unos segundos/minutos (dependiendo de la cola de GitHub).");
+        } else {
+            const err = await res.json();
+            throw new Error(err.message || res.statusText);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("❌ Error lanzando la prueba: " + e.message);
+    } finally {
+        const btn = document.getElementById('btnTestNtfy');
+        if(btn) {
+            btn.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> Lanzar Prueba de Notificación`;
+            btn.disabled = false;
+        }
+    }
+}
+
 function toggleConfig() {
     const el = document.getElementById("configPanel");
     if(el) {
