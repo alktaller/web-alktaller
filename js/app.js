@@ -737,10 +737,15 @@ function renderReminders(){
     // KM Calculation
     let dueKm = 0;
     let remainingKm = 0;
+    let effectiveTargetKm = null;
+    let effectiveTargetDate = null;
+
     if(r.type === 'km' || r.type === 'both') {
        if(r.intervalKm > 0) {
            dueKm = lastKm + Number(r.intervalKm);
-           remainingKm = dueKm - currentOdometer;
+           effectiveTargetKm = (r.targetKm !== undefined && r.targetKm !== null) ? Number(r.targetKm) : dueKm;
+           
+           remainingKm = effectiveTargetKm - currentOdometer;
            if(remainingKm < 0) status = 'danger';
            else if(remainingKm < 1000 && status !== 'danger') status = 'warning';
        }
@@ -757,16 +762,31 @@ function renderReminders(){
     else if(r.intervalDays) { timeVal=Math.round(r.intervalDays/30); timeUnit='months'; } // Legacy
 
     if(r.type === 'date' || r.type === 'both') {
+        // Use user manual date if exists
+        if (r.targetDate) {
+            effectiveTargetDate = new Date(r.targetDate);
+        }
+
         let monthsToAdd = 0;
         if(timeUnit === 'months') monthsToAdd = Number(timeVal);
         else if(timeUnit === 'years') monthsToAdd = Number(timeVal) * 12;
 
-        if(monthsToAdd > 0) {
+        if(effectiveTargetDate) {
+             // Valid simple logic from manual date
+            const diffTime = effectiveTargetDate - today;
+            remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if(remainingDays < 0) status = 'danger';
+            else if(remainingDays < 30 && status !== 'danger') status = 'warning';
+
+        } else if(monthsToAdd > 0) {
             if(!lastDate) {
                  status = 'danger'; // Never done
             } else {
                 dueDate = new Date(lastDate);
                 dueDate.setMonth(dueDate.getMonth() + monthsToAdd);
+                effectiveTargetDate = dueDate; // Calc default
+
                 const diffTime = dueDate - today;
                 remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 
@@ -775,6 +795,10 @@ function renderReminders(){
             }
         }
     }
+    
+    // For input rendering
+    // Date inputs need YYYY-MM-DD
+    const dateInputVal = effectiveTargetDate ? effectiveTargetDate.toISOString().split('T')[0] : '';
 
     // Build Card
     const card = document.createElement("div");
@@ -802,12 +826,12 @@ function renderReminders(){
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:8px; font-size:0.9rem;">
                     <div style="background:#f8fafc; padding:5px; border-radius:4px;">
-                        <span style="display:block; font-size:0.75rem; color:#64748b;">Próximo aviso</span>
-                        <strong style="color:#0f172a;">${r.intervalKm > 0 ? dueKm.toLocaleString() : '-'} km</strong>
+                        <span style="display:block; font-size:0.75rem; color:#64748b;">Próximo aviso (Editable)</span>
+                        <input type="number" value="${effectiveTargetKm || ''}" onchange="updateReminder(${index},'targetKm',this.value)" style="width:100%; border:1px solid #ddd; border-radius:4px; padding:2px 5px; font-weight:bold; color:#0f172a;">
                     </div>
                     <div style="background:#f8fafc; padding:5px; border-radius:4px;">
                         <span style="display:block; font-size:0.75rem; color:#64748b;">Te quedan</span>
-                        <strong style="color:${remainingKm < 0 ? '#ef4444' : '#0f172a'};">${r.intervalKm > 0 ? remainingKm.toLocaleString() : '-'} km</strong>
+                        <strong style="color:${remainingKm < 0 ? '#ef4444' : '#0f172a'};">${effectiveTargetKm ? remainingKm.toLocaleString() : '-'} km</strong>
                     </div>
                 </div>
             </div>
@@ -816,8 +840,7 @@ function renderReminders(){
 
     let dateSection = '';
     if(r.type === 'date' || r.type === 'both') {
-        const dueDateStr = dueDate ? dueDate.toLocaleDateString() : 'Pendiente 1º reg.';
-        const remainingText = dueDate ? (remainingDays < 0 ? `Hace ${Math.abs(remainingDays)} días` : `${remainingDays} días`) : '-';
+        const remainingText = effectiveTargetDate ? (remainingDays < 0 ? `Hace ${Math.abs(remainingDays)} días` : `${remainingDays} días`) : '-';
 
         dateSection = `
             <div style="margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9;">
@@ -833,12 +856,12 @@ function renderReminders(){
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:8px; font-size:0.9rem;">
                     <div style="background:#f8fafc; padding:5px; border-radius:4px;">
-                        <span style="display:block; font-size:0.75rem; color:#64748b;">Próxima fecha</span>
-                        <strong style="color:#0f172a;">${monthsToAdd > 0 ? dueDateStr : '-'}</strong>
+                        <span style="display:block; font-size:0.75rem; color:#64748b;">Próxima fecha (Editable)</span>
+                        <input type="date" value="${dateInputVal}" onchange="updateReminder(${index}, 'targetDate', this.value)" style="width:100%; border:1px solid #ddd; border-radius:4px; padding:2px 5px; font-weight:bold; color:#0f172a;">
                     </div>
                     <div style="background:#f8fafc; padding:5px; border-radius:4px;">
                         <span style="display:block; font-size:0.75rem; color:#64748b;">Te quedan</span>
-                        <strong style="color:${remainingDays < 0 ? '#ef4444' : '#0f172a'};">${monthsToAdd > 0 ? remainingText : '-'}</strong>
+                        <strong style="color:${remainingDays < 0 ? '#ef4444' : '#0f172a'};">${effectiveTargetDate ? remainingText : '-'}</strong>
                     </div>
                 </div>
             </div>
@@ -905,15 +928,29 @@ function updateReminderTime(index, value, unit) {
        r.intervalYears = 0;
    }
    
+   // Reset manual target date when interval changes
+   r.targetDate = null;
+   
    renderReminders();
    saveData(data);
 }
 
 function updateReminder(index,field,value){
-  if(field==='intervalKm') value=Number(value);
+  const r = currentVehicle.reminders[index];
+  
+  if(field==='intervalKm') {
+      value=Number(value);
+      r.targetKm = null; // Reset manual override
+  }
+  if(field==='targetKm') {
+      value=Number(value);
+  }
+  
   if(field==='title') checkAndAddCategory(value);
   
-  currentVehicle.reminders[index][field]=value; saveData(data);
+  r[field]=value; 
+  renderReminders();
+  saveData(data);
 }
 
 function deleteReminder(index){
