@@ -465,7 +465,7 @@ window.openTab = function(tabId) {
 };
 
 // Initial check & Boot
-(async function boot() {
+async function initApp() {
   try {
       const token = sessionStorage.getItem("githubToken");
       const loginScreen = document.getElementById("login-screen");
@@ -478,12 +478,11 @@ window.openTab = function(tabId) {
         const launch = async () => {
             try {
                 await start();
-                window.openTab('dashboard');
+                // Ensure dashboard is open by default
+                if(window.openTab) window.openTab('dashboard');
             } catch (e) {
                 console.error("Boot Error:", e);
                 alert("Error crítico al iniciar la aplicación: " + e.message);
-                // Fallback to login if data load fails hard (e.g. 401)
-                // But start() handles 401 by calling logout within loadData usually.
             }
         };
 
@@ -498,4 +497,6 @@ window.openTab = function(tabId) {
   } catch (err) {
       alert("Error fatal de arranque: " + err.message);
   }
-})();
+}
+
+initApp();
