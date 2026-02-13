@@ -1,6 +1,6 @@
 // Configuración Fija
 const GITHUB_USER = "alktaller";
-const GITHUB_REPO = "web-alktaller";
+const GITHUB_REPO = "mis-datos-coche";
 const GITHUB_PATH = "data/car-data.json";
 
 let githubSha = null;

@@ -81,7 +81,10 @@ async function testNotifications() {
             btn.disabled = true;
         }
 
-        const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/actions/workflows/reminders.yml/dispatches`, {
+        // El workflow está en el repositorio de la web, no necesariamente en el de datos
+        const workflowRepo = "web-alktaller"; 
+
+        const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${workflowRepo}/actions/workflows/reminders.yml/dispatches`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
