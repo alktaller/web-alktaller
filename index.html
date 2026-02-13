@@ -180,7 +180,8 @@
               </h2>
               <div class="form-group">
                 <input id="maintDate" type="date">
-                <input id="maintType" placeholder="Tipo (aceite, frenos...)" list="maintenance-categories">
+                <input id="maintType" placeholder="Tipo (aceite, frenos...)" list="maintenance-categories" autocomplete="off">
+                <datalist id="maintenance-categories"></datalist>
                 <input id="maintOdo" type="number" placeholder="Kilómetros">
                 <input id="maintCost" type="number" placeholder="Coste (€)">
                 
@@ -239,8 +240,8 @@
   </main>
 </div>
 
-<script src="js/storage.js?v=5"></script>
-<script src="js/app.js?v=5"></script>
+<script src="js/storage.js?v=7"></script>
+<script src="js/app.js?v=7"></script>
 
 </body>
 </html>

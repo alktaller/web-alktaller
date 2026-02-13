@@ -440,7 +440,7 @@ function renderTimeline() {
                 <div style="font-weight:bold; color:#F97316; margin-bottom:5px;">Editando Mantenimiento</div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; width:100%">
                     <input type="date" id="edit_date_${e._origIndex}" value="${escapeAttr(e.date)}" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
-                    <input type="text" id="edit_type_${e._origIndex}" value="${escapeAttr(e.maintType)}" placeholder="Tipo" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="text" id="edit_type_${e._origIndex}" value="${escapeAttr(e.maintType)}" placeholder="Tipo" list="maintenance-categories" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
                     <input type="number" id="edit_odo_${e._origIndex}" value="${escapeAttr(e.odometer)}" placeholder="km" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
                     <input type="number" id="edit_cost_${e._origIndex}" value="${escapeAttr(e.cost)}" placeholder="€" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
                 </div>
