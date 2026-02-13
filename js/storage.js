@@ -188,7 +188,13 @@ async function uploadImage(file) {
                 if (!res.ok) throw new Error("GitHub Upload Failed");
                 
                 const json = await res.json();
-                resolve({ path: path, url: json.content.html_url, download_url: json.content.download_url });
+                // Return API URL as well for secure raw fetching
+                resolve({ 
+                    path: path, 
+                    url: json.content.html_url, 
+                    download_url: json.content.download_url,
+                    api_url: json.content.url
+                });
             } catch (err) {
                 reject(err);
             }

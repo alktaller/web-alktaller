@@ -183,21 +183,22 @@ async function loadImageSecurely(url, imgElement) {
     }
 
     try {
-        // Si no es de github, intentar carga directa
-        if (!url.includes('githubusercontent.com') && !url.includes('api.github.com')) {
+        const token = sessionStorage.getItem("githubToken");
+        
+        // Si no es de github, usar directo
+        if (!url.includes('github') || !token) {
             imgElement.src = url;
             return;
         }
 
-        const token = sessionStorage.getItem("githubToken");
-        if (!token) {
-            imgElement.src = url; // Fallback
-            return;
+        const headers = { 'Authorization': `Bearer ${token}` };
+        
+        // Si es URL de API, pedir formato RAW
+        if (url.includes('api.github.com')) {
+            headers['Accept'] = 'application/vnd.github.v3.raw';
         }
 
-        const res = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(url, { headers });
 
         if (res.ok) {
             const blob = await res.blob();
@@ -205,7 +206,8 @@ async function loadImageSecurely(url, imgElement) {
             imgElement.src = fieldUrl;
         } else {
             console.warn("Fallo cargando imagen segura", res.status);
-            imgElement.src = url; // Fallback
+            // Fallback con token en URL si fuera posible o URL directa
+            imgElement.src = url; 
         }
     } catch (e) {
         console.error("Error cargando imagen segura", e);
@@ -284,8 +286,8 @@ async function uploadVehiclePhoto(input) {
         try {
             document.getElementById('vehiclePhotoStatus').textContent = "Subiendo foto...";
             const result = await uploadImage(input.files[0]);
-            // Usamos download_url para obtener la imagen raw
-            currentVehicle.photo = result.download_url;
+            // Usamos api_url para asegurar acceso con token via API raw media type
+            currentVehicle.photo = result.api_url;
             await saveData(data);
             document.getElementById('vehiclePhotoStatus').textContent = "";
             renderVehicleInfo();
