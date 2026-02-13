@@ -186,6 +186,21 @@ function renderVehicleInfo() {
   document.getElementById("infoInsuranceCompany").value = currentVehicle.insuranceCompany || "";
   document.getElementById("infoInsurancePolicy").value = currentVehicle.insurancePolicy || "";
 
+  // Foto del vehículo
+  const imgPhoto = document.getElementById("vehiclePhotoImg");
+  const svgPlaceholder = document.getElementById("vehiclePhotoPlaceholder");
+  
+  if (imgPhoto && svgPlaceholder) {
+      if (currentVehicle.photo) {
+          imgPhoto.src = currentVehicle.photo;
+          imgPhoto.style.display = "block";
+          svgPlaceholder.style.display = "none";
+      } else {
+          imgPhoto.style.display = "none";
+          svgPlaceholder.style.display = "block";
+      }
+  }
+
   const linkPolicy = document.getElementById("linkViewPolicy");
   if (linkPolicy) {
       if(currentVehicle.insuranceFile) {
@@ -217,6 +232,23 @@ async function uploadVehiclePolicy(input) {
         } catch(e) {
             alert("Error subiendo: " + e.message);
             document.getElementById('uploadStatus').textContent = "Error";
+        }
+    }
+}
+
+async function uploadVehiclePhoto(input) {
+    if(!currentVehicle) return;
+    if(input.files && input.files[0]) {
+        try {
+            document.getElementById('vehiclePhotoStatus').textContent = "Subiendo foto...";
+            const result = await uploadImage(input.files[0]);
+            currentVehicle.photo = result.url;
+            await saveData(data);
+            document.getElementById('vehiclePhotoStatus').textContent = "";
+            renderVehicleInfo();
+        } catch(e) {
+            alert("Error al subir foto: " + e.message);
+            document.getElementById('vehiclePhotoStatus').textContent = "❌ Error";
         }
     }
 }

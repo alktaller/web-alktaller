@@ -103,13 +103,36 @@ header {
   gap: 0.5rem;
 }
 
+.user-area .btn-secondary {
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%; /* Circular button */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: var(--text-color);
+  transition: all 0.2s;
+}
+
+.user-area .btn-secondary:hover {
+  background-color: #EDF2F7;
+  color: var(--primary-color);
+}
+
+.user-area .icon {
+  margin: 0;
+  width: 22px;
+  height: 22px;
+}
+
 /* Mobile Header Config */
 @media (max-width: 600px) {
-  header { padding: 0.8rem 1rem; }
-  header h1 { font-size: 1.1rem; }
-  .user-area .btn-secondary { padding: 0.5rem; }
-  .user-area .btn-secondary .btn-text { display: none; }
-  .user-area .icon { margin-right: 0; }
+  header { padding: 0.5rem 1rem; }
+  header h1 { font-size: 1.2rem; }
+  .logo-area { gap: 0.5rem; }
+  .app-logo { height: 32px; }
 }
 
 .logo-area {
