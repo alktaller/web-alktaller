@@ -699,135 +699,215 @@ function renderStats() {
 
 // ---------------- RECORDATORIOS EDITABLES ----------------
 function renderReminders(){
-  const tbody=document.querySelector("#reminderTable tbody"); tbody.innerHTML="";
+  const container = document.getElementById("remindersList"); 
+  if(!container) return; // Safety check
+  container.innerHTML="";
   if(!currentVehicle) return;
 
   const currentOdometer = currentVehicle.currentOdometer || calculateMaxOdometer();
   const today = new Date();
 
   currentVehicle.reminders.forEach((r,index)=>{
-    // Lógica de Estado (Semáforo)
-    let status = 'ok'; 
-    let reasons = [];
+    // Migration: ensure type exists. Default to 'both' if existing data implies it, else 'km'
+    if(!r.type) {
+        if(r.intervalKm > 0 && (r.intervalMonths > 0 || r.intervalYears > 0 || r.intervalDays > 0)) r.type = 'both';
+        else if(r.intervalMonths > 0 || r.intervalYears > 0 || r.intervalDays > 0) r.type = 'date';
+        else r.type = 'km';
+    }
 
-    // 1. Buscar último mantenimiento realizado que coincida con el título
+    // 1. Logic for Status & Calculation
+    let status = 'ok'; 
+    let reasons = []; // Not used for tooltip anymore, but for card styling maybe?
+    
+    // Find last completion
     const matches = currentVehicle.maintenanceEntries.filter(m => 
         m.maintType && r.title && m.maintType.toLowerCase().trim() === r.title.toLowerCase().trim()
     );
-
     let lastKm = 0;
     let lastDate = null;
 
     if(matches.length > 0) {
-        // Ordenar por odómetro desc
         matches.sort((a,b) => b.odometer - a.odometer);
-        lastKm = matches[0].odometer; // El más reciente en KM
+        lastKm = matches[0].odometer;
 
-        // Ordenar por fecha desc (puede ser distinto si metieron datos desordenados)
         const timeMatches = [...matches].sort((a,b) => new Date(b.date) - new Date(a.date));
         lastDate = new Date(timeMatches[0].date);
     }
 
-    // 2. Calcular Status por KM
-    if(r.intervalKm > 0) {
-        const dueKm = lastKm + r.intervalKm;
-        const remainingKm = dueKm - currentOdometer;
-        
-        if (remainingKm < 0) {
-            status = 'danger';
-            reasons.push(`Pasado por ${Math.abs(remainingKm)} km`);
-        } else if (remainingKm < 1000) {
-            if(status !== 'danger') status = 'warning';
-            reasons.push(`Vence en ${remainingKm} km`);
-        } else {
-            reasons.push(`Quedan ${remainingKm} km`);
-        }
+    // KM Calculation
+    let dueKm = 0;
+    let remainingKm = 0;
+    if(r.type === 'km' || r.type === 'both') {
+       if(r.intervalKm > 0) {
+           dueKm = lastKm + Number(r.intervalKm);
+           remainingKm = dueKm - currentOdometer;
+           if(remainingKm < 0) status = 'danger';
+           else if(remainingKm < 1000 && status !== 'danger') status = 'warning';
+       }
     }
 
-    // 3. Calcular Status por Tiempo
-    let monthsToAdd = 0;
-    if(r.intervalMonths) monthsToAdd = r.intervalMonths;
-    else if(r.intervalYears) monthsToAdd = r.intervalYears * 12;
-    // Si guardó days (legacy), convertimos
-    else if(r.intervalDays) monthsToAdd = r.intervalDays / 30;
+    // Date Calculation
+    let dueDate = null;
+    let remainingDays = 0;
+    
+    let timeVal = 0;
+    let timeUnit = 'months';
+    if(r.intervalMonths) { timeVal=r.intervalMonths; timeUnit='months'; }
+    else if(r.intervalYears) { timeVal=r.intervalYears; timeUnit='years'; }
+    else if(r.intervalDays) { timeVal=Math.round(r.intervalDays/30); timeUnit='months'; } // Legacy
 
-    if(monthsToAdd > 0) {
-        if (!lastDate) {
-            // Nunca hecho y tiene fecha límite -> Danger o Warning?
-            // Si el coche es nuevo no pasa nada, pero asumimos que si configuras recordatorio quieres control.
-            status = 'danger';
-            reasons.push("Nunca realizado (fecha)");
-        } else {
-            const dueDate = new Date(lastDate);
-            dueDate.setMonth(dueDate.getMonth() + monthsToAdd);
-            
-            // Diff en días
-            const diffTime = dueDate - today;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-            
-            if(diffDays < 0) {
-                status = 'danger';
-                reasons.push(`Vencido hace ${Math.abs(diffDays)} días`);
-            } else if(diffDays < 30) {
-                if(status !== 'danger') status = 'warning';
-                reasons.push(`Vence en ${diffDays} días`);
+    if(r.type === 'date' || r.type === 'both') {
+        let monthsToAdd = 0;
+        if(timeUnit === 'months') monthsToAdd = Number(timeVal);
+        else if(timeUnit === 'years') monthsToAdd = Number(timeVal) * 12;
+
+        if(monthsToAdd > 0) {
+            if(!lastDate) {
+                 status = 'danger'; // Never done
             } else {
-                reasons.push(`Quedan ${diffDays} días`);
+                dueDate = new Date(lastDate);
+                dueDate.setMonth(dueDate.getMonth() + monthsToAdd);
+                const diffTime = dueDate - today;
+                remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                if(remainingDays < 0) status = 'danger';
+                else if(remainingDays < 30 && status !== 'danger') status = 'warning';
             }
         }
     }
 
-    // Preparar UI
-    
-    let timeVal = 0;
-    let timeUnit = 'months'; // default
-    
-    if (r.intervalMonths) {
-       timeVal = r.intervalMonths;
-       timeUnit = 'months';
-    } else if (r.intervalYears) {
-       timeVal = r.intervalYears;
-       timeUnit = 'years';
-    } else if (r.intervalDays) {
-       timeVal = Math.round(r.intervalDays / 30);
-       timeUnit = 'months';
+    // Build Card
+    const card = document.createElement("div");
+    card.className = `reminder-card status-${status}`;
+    card.style.cssText = `
+        border: 1px solid #e2e8f0; 
+        border-radius: 8px; 
+        padding: 12px; 
+        background: white; 
+        position: relative;
+        border-left: 5px solid ${status === 'danger' ? '#ef4444' : status === 'warning' ? '#f59e0b' : '#10b981'};
+    `;
+
+    // HTML Structure
+    let kmSection = '';
+    if(r.type === 'km' || r.type === 'both') {
+        kmSection = `
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label style="font-size:0.85rem; color:#64748b;">Intervalo (km)</label>
+                    <div class="input-with-suffix">
+                        <input type="number" value="${r.intervalKm}" onchange="updateReminder(${index},'intervalKm',this.value)" style="width:80px; text-align:right;">
+                        <span style="font-size:0.8rem; color:#64748b; margin-left:2px;">km</span>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:8px; font-size:0.9rem;">
+                    <div style="background:#f8fafc; padding:5px; border-radius:4px;">
+                        <span style="display:block; font-size:0.75rem; color:#64748b;">Próximo aviso</span>
+                        <strong style="color:#0f172a;">${r.intervalKm > 0 ? dueKm.toLocaleString() : '-'} km</strong>
+                    </div>
+                    <div style="background:#f8fafc; padding:5px; border-radius:4px;">
+                        <span style="display:block; font-size:0.75rem; color:#64748b;">Te quedan</span>
+                        <strong style="color:${remainingKm < 0 ? '#ef4444' : '#0f172a'};">${r.intervalKm > 0 ? remainingKm.toLocaleString() : '-'} km</strong>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
-    const tr=document.createElement("tr");
-    tr.className = `status-${status}`;
-    tr.title = reasons.join(" • "); // Tooltip nativo
+    let dateSection = '';
+    if(r.type === 'date' || r.type === 'both') {
+        const dueDateStr = dueDate ? dueDate.toLocaleDateString() : 'Pendiente 1º reg.';
+        const remainingText = dueDate ? (remainingDays < 0 ? `Hace ${Math.abs(remainingDays)} días` : `${remainingDays} días`) : '-';
 
-    tr.innerHTML=`
-      <td><input type="text" value="${r.title}" list="maintenance-categories" onchange="updateReminder(${index},'title',this.value)"></td>
-      <td><input type="number" value="${r.intervalKm}" onchange="updateReminder(${index},'intervalKm',this.value)" style="width: 80px"> km</td>
-      <td style="display:flex; gap:5px;">
-        <input type="number" value="${timeVal}" onchange="updateReminderTime(${index}, this.value, document.getElementById('unit_${index}').value)" style="width: 60px">
-        <select id="unit_${index}" onchange="updateReminderTime(${index}, this.previousElementSibling.value, this.value)">
-           <option value="months" ${timeUnit==='months'?'selected':''}>Meses</option>
-           <option value="years" ${timeUnit==='years'?'selected':''}>Años</option>
-        </select>
-      </td>
-      <td><button onclick="deleteReminder(${index})" class="btn-danger">❌</button></td>
+        dateSection = `
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label style="font-size:0.85rem; color:#64748b;">Intervalo (Tiempo)</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="number" value="${timeVal}" onchange="updateReminderTime(${index}, this.value, document.getElementById('unit_${index}').value)" style="width:60px; text-align:right;">
+                        <select id="unit_${index}" onchange="updateReminderTime(${index}, this.previousElementSibling.value, this.value)" style="font-size:0.85rem;">
+                             <option value="months" ${timeUnit==='months'?'selected':''}>Meses</option>
+                             <option value="years" ${timeUnit==='years'?'selected':''}>Años</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:8px; font-size:0.9rem;">
+                    <div style="background:#f8fafc; padding:5px; border-radius:4px;">
+                        <span style="display:block; font-size:0.75rem; color:#64748b;">Próxima fecha</span>
+                        <strong style="color:#0f172a;">${monthsToAdd > 0 ? dueDateStr : '-'}</strong>
+                    </div>
+                    <div style="background:#f8fafc; padding:5px; border-radius:4px;">
+                        <span style="display:block; font-size:0.75rem; color:#64748b;">Te quedan</span>
+                        <strong style="color:${remainingDays < 0 ? '#ef4444' : '#0f172a'};">${monthsToAdd > 0 ? remainingText : '-'}</strong>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Categories for title
+    const categoriesOptions = data.categories.sort().map(c => `<option value="${escapeAttr(c)}">`).join('');
+
+    card.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+             <div style="flex:1; margin-right:10px;">
+                 <label style="font-size:0.75rem; color:#64748b; display:block; margin-bottom:2px;">Título (Tipo de mantenimiento)</label>
+                 <input type="text" value="${escapeAttr(r.title)}" list="rem_cat_list_${index}" 
+                        onchange="updateReminder(${index},'title',this.value)" 
+                        style="width:100%; font-weight:bold; border:1px solid #cbd5e1; border-radius:4px; padding:4px;">
+                 <datalist id="rem_cat_list_${index}">${categoriesOptions}</datalist>
+             </div>
+             <div>
+                 <label style="font-size:0.75rem; color:#64748b; display:block; margin-bottom:2px;">Tipo</label>
+                 <select onchange="updateReminder(${index},'type',this.value)" style="padding:4px; border-radius:4px; border:1px solid #cbd5e1;">
+                     <option value="km" ${r.type==='km'?'selected':''}>Por Km</option>
+                     <option value="date" ${r.type==='date'?'selected':''}>Por Fecha</option>
+                     <option value="both" ${r.type==='both'?'selected':''}>Ambos</option>
+                 </select>
+             </div>
+             <button onclick="deleteReminder(${index})" style="margin-left:10px; background:none; border:none; cursor:pointer; color:#ef4444; padding-top:15px;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+             </button>
+        </div>
+        ${kmSection}
+        ${dateSection}
     `;
-    tbody.appendChild(tr);
+
+    container.appendChild(card);
   });
 }
 
 function addReminder(){ 
-  const r={ title:"Nuevo mantenimiento", intervalKm:0, intervalMonths:0, lastOdometer:0, lastDate:null };
-  currentVehicle.reminders.push(r); renderReminders(); saveData(data);
+  // Default new reminder
+  const r={ title:"", type:"km", intervalKm:15000, intervalMonths:0, lastOdometer:0, lastDate:null };
+  currentVehicle.reminders.push(r); 
+  renderReminders(); 
+  saveData(data);
 }
 
 // Helper especial para cambiar tiempo/unidad y guardarlo en el formato correcto
-// Guardamos siempre como "intervalMonths" en el JSON para estandarizar en Backend, 
-// o intervalDays si queremos maxima compatibilidad, pero el usuario pidió MESES/AÑOS.
-// Voy a guardar: intervalMonths (borrando intervalDays viejo para limpiar)
+// Guardamos siempre como "intervalMonths" en el JSON
 function updateReminderTime(index, value, unit) {
    const val = Number(value);
    const r = currentVehicle.reminders[index];
    
-   // Limpiamos propiedades antiguas para no confundir
+   // Clean legacy
    delete r.intervalDays;
+   delete r.intervalYears;
+
+   if(unit === 'years') {
+       r.intervalYears = val; // Store explicit years if user selected years?
+       // Actually cleaner: store only intervalMonths internally, OR store separate boolean?
+       // Let's stick to storing what user selected to persist the "Unit" selection UI state implicitly
+       r.intervalMonths = 0; 
+   } else {
+       r.intervalMonths = val;
+       r.intervalYears = 0;
+   }
+   
+   renderReminders();
+   saveData(data);
+}
    delete r.intervalYears;
    
    if (unit === 'years') {
