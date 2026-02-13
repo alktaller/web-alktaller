@@ -466,22 +466,36 @@ window.openTab = function(tabId) {
 
 // Initial check & Boot
 (async function boot() {
-  const token = sessionStorage.getItem("githubToken");
-  if(token) {
-    document.getElementById("login-screen").classList.add("hidden");
-    document.getElementById("app-container").classList.remove("hidden");
-    
-    if (document.readyState === 'loading') {
-       document.addEventListener('DOMContentLoaded', () => {
-           start();
-           // Open default tab
-           window.openTab('dashboard');
-       });
-    } else {
-       await start();
-       window.openTab('dashboard');
-    }
-  } else {
-    document.getElementById("login-screen").classList.remove("hidden");
+  try {
+      const token = sessionStorage.getItem("githubToken");
+      const loginScreen = document.getElementById("login-screen");
+      const appContainer = document.getElementById("app-container");
+      
+      if(token) {
+        if(loginScreen) loginScreen.classList.add("hidden");
+        if(appContainer) appContainer.classList.remove("hidden");
+        
+        const launch = async () => {
+            try {
+                await start();
+                window.openTab('dashboard');
+            } catch (e) {
+                console.error("Boot Error:", e);
+                alert("Error crítico al iniciar la aplicación: " + e.message);
+                // Fallback to login if data load fails hard (e.g. 401)
+                // But start() handles 401 by calling logout within loadData usually.
+            }
+        };
+
+        if (document.readyState === 'loading') {
+           document.addEventListener('DOMContentLoaded', launch);
+        } else {
+           await launch();
+        }
+      } else {
+        if(loginScreen) loginScreen.classList.remove("hidden");
+      }
+  } catch (err) {
+      alert("Error fatal de arranque: " + err.message);
   }
 })();
