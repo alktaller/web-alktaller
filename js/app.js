@@ -172,6 +172,47 @@ function renderVehicleSelect() {
 
 // --- NUEVA LÓGICA DE INFORMACIÓN DE VEHÍCULO ---
 
+// Helper para cargar imagen privada
+async function loadImageSecurely(url, imgElement) {
+    if (!url) return;
+    
+    // Si es un blob local (recién subido u optimizado), usar directo
+    if (url.startsWith('blob:')) {
+        imgElement.src = url;
+        return;
+    }
+
+    try {
+        // Si no es de github, intentar carga directa
+        if (!url.includes('githubusercontent.com') && !url.includes('api.github.com')) {
+            imgElement.src = url;
+            return;
+        }
+
+        const token = sessionStorage.getItem("githubToken");
+        if (!token) {
+            imgElement.src = url; // Fallback
+            return;
+        }
+
+        const res = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+            const blob = await res.blob();
+            const fieldUrl = URL.createObjectURL(blob);
+            imgElement.src = fieldUrl;
+        } else {
+            console.warn("Fallo cargando imagen segura", res.status);
+            imgElement.src = url; // Fallback
+        }
+    } catch (e) {
+        console.error("Error cargando imagen segura", e);
+        imgElement.src = url;
+    }
+}
+
 function renderVehicleInfo() {
   if(!currentVehicle) return;
   
@@ -192,7 +233,8 @@ function renderVehicleInfo() {
   
   if (imgPhoto && svgPlaceholder) {
       if (currentVehicle.photo) {
-          imgPhoto.src = currentVehicle.photo;
+          // Usar carga segura para repos privados
+          loadImageSecurely(currentVehicle.photo, imgPhoto);
           imgPhoto.style.display = "block";
           svgPlaceholder.style.display = "none";
       } else {
@@ -242,7 +284,8 @@ async function uploadVehiclePhoto(input) {
         try {
             document.getElementById('vehiclePhotoStatus').textContent = "Subiendo foto...";
             const result = await uploadImage(input.files[0]);
-            currentVehicle.photo = result.url;
+            // Usamos download_url para obtener la imagen raw
+            currentVehicle.photo = result.download_url;
             await saveData(data);
             document.getElementById('vehiclePhotoStatus').textContent = "";
             renderVehicleInfo();
