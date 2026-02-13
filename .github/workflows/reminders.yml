@@ -10,6 +10,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Checkout Data Repository
+        uses: actions/checkout@v3
+        with:
+          repository: alktaller/mis-datos-coche
+          path: mis-datos-coche
+          token: ${{ secrets.API_TOKEN_GITHUB || secrets.GITHUB_TOKEN }}
+          
+      - name: Prepare Data File
+        run: |
+          mkdir -p data
+          if [ -f "mis-datos-coche/data/car-data.json" ]; then
+            cp mis-datos-coche/data/car-data.json data/car-data.json
+            echo "Data file successfully loaded from external repo."
+          else
+            echo "::warning::File not found in standard path. Listing repo content:"
+            ls -R mis-datos-coche
+            echo "::error::Could not find data/car-data.json in alktaller/mis-datos-coche"
+            exit 1
+          fi
+
       - uses: actions/setup-node@v3
         with: { node-version: 20 }
       - name: Enviar notificaciones Ntfy
