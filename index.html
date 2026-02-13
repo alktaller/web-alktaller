@@ -22,6 +22,14 @@
       <p class="tiny-text">(Te abrirá GitHub. Baja al final, pulsa "Generate token" y pégalo abajo)</p>
     </div>
 
+    <div class="input-group-vertical" style="text-align: left; margin-bottom: 1rem;">
+       <label for="repoUser" style="font-size: 0.85rem; font-weight: bold;">Usuario / Organización</label>
+       <input type="text" id="repoUser" placeholder="Ej: alktaller">
+       
+       <label for="repoName" style="font-size: 0.85rem; font-weight: bold; margin-top: 0.5rem;">Repositorio</label>
+       <input type="text" id="repoName" placeholder="Ej: web-alktaller">
+    </div>
+
     <div class="input-group">
       <input type="password" id="githubTokenInput" placeholder="Pega aquí tu token (ghp_...)">
       <button onclick="handleLogin()" class="btn-primary">Entrar</button>
