@@ -140,6 +140,10 @@
                 <input id="fuelOdo" type="number" placeholder="Kilómetros">
                 <input id="fuelLiters" type="number" placeholder="Litros">
                 <input id="fuelCost" type="number" placeholder="Coste total (€)">
+                <div style="display:flex; align-items:center; gap:10px; margin: 5px 0;">
+                    <input type="checkbox" id="fuelIsFull" checked style="width:auto; margin:0;">
+                    <label for="fuelIsFull">Depósito Lleno</label>
+                </div>
                 <button onclick="addFuel()" class="btn-primary">
                     <svg class="icon" viewBox="0 0 24 24" style="stroke:white"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v13a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                     Guardar repostaje

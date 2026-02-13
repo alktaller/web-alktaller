@@ -171,6 +171,7 @@ async function addFuel() {
   const odoEl = document.getElementById('fuelOdo');
   const litersEl = document.getElementById('fuelLiters');
   const costEl = document.getElementById('fuelCost');
+  const isFullEl = document.getElementById('fuelIsFull');
 
   if(!dateEl.value || !odoEl.value) { alert("Fecha y Km son obligatorios"); return; }
 
@@ -179,7 +180,8 @@ async function addFuel() {
       date: dateEl.value, 
       odometer: Number(odoEl.value), 
       liters: Number(litersEl.value), 
-      totalCost: Number(costEl.value)
+      totalCost: Number(costEl.value),
+      isFull: isFullEl ? isFullEl.checked : true
   };
   
   currentVehicle.fuelEntries.push(entry); 
@@ -187,6 +189,7 @@ async function addFuel() {
   
   // Limpiar formulario
   dateEl.value = ""; odoEl.value = ""; litersEl.value = ""; costEl.value = "";
+  if(isFullEl) isFullEl.checked = true;
   
   renderTimeline(); renderReminders(); renderStats();
   await saveData(data);
@@ -235,7 +238,7 @@ async function addMaintenance() {
       maintType: typeEl.value, 
       odometer: Number(odoEl.value), 
       cost: Number(costEl.value),
-      garage: garageEl ? garageEl.value : "",
+      notes: garageEl ? garageEl.value : "",
       ticket: ticketUrl
   };
   
@@ -258,46 +261,129 @@ function renderTimeline() {
   if(!currentVehicle) return;
   
   // Combine and sort entries
-  const all=[...currentVehicle.fuelEntries, ...currentVehicle.maintenanceEntries]
-    .sort((a,b) => new Date(b.date) - new Date(a.date));
+  const fuels = currentVehicle.fuelEntries.map((e,i) => ({...e, _origIndex: i, _type: 'fuel'}));
+  const maints = currentVehicle.maintenanceEntries.map((e,i) => ({...e, _origIndex: i, _type: 'maintenance'}));
+
+  const all=[...fuels, ...maints].sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  // Defines SVG Icons
+  const icons = {
+      fuel: `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#3B82F6"><path d="M3 21.01h.01"></path><path d="M9 21.01h.01"></path><path d="M15 21.01h.01"></path><path d="M21 21.01h.01"></path><path d="M4 21a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2"></path><path d="M3 11h18"></path><path d="M15 11v10"></path></svg>`,
+      maint: `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#F97316"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`,
+      pin: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:text-bottom"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`,
+      ticket: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:text-bottom"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`,
+      camera: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:text-bottom"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`,
+      check: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:#10B981; vertical-align:text-bottom"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+      alert: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:#F59E0B; vertical-align:text-bottom"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`
+  };
 
   all.forEach(e => { 
       const li = document.createElement("li");
-      li.className = "timeline-item"; // Add class for styling
-      li.style.cssText = "padding: 10px; border-bottom: 1px solid #eee; display: flex; align-items: flex-start; gap: 10px;";
+      li.className = "timeline-item";
+      li.style.cssText = "padding: 12px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: flex-start; gap: 15px;";
 
-      // Icon based on type
-      const icon = e.type === "fuel" ? "⛽" : "🔧";
-      
+      // Main Icon Container
+      const iconDiv = document.createElement("div");
+      iconDiv.style.cssText = `
+        min-width: 40px; height: 40px; 
+        border-radius: 50%; 
+        background: ${e.type === "fuel" ? "#EFF6FF" : "#FFF7ED"}; 
+        display: flex; align-items: center; justify-content: center;
+      `;
+      iconDiv.innerHTML = e.type === "fuel" ? icons.fuel : icons.maint;
+
       const detailsDiv = document.createElement("div");
       detailsDiv.style.flex = "1";
 
       if(e.type === "fuel") {
+          const statusIcon = e.isFull ? icons.check : icons.alert;
           detailsDiv.innerHTML = `
-            <strong>${e.date}</strong> — Repostaje<br>
-            <span style="color:#666">${e.liters}L — ${e.totalCost}€ (${e.odometer} km)</span>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="color:#334155">Repostaje</strong>
+                <span style="font-size:0.85rem; color:#94a3b8">${e.date}</span>
+            </div>
+            <div style="color:#475569; margin-top:4px;">
+                ${e.liters} L (${e.totalCost}€) <span style="color:#cbd5e1">|</span> ${e.odometer} km
+                <span title="${e.isFull?'Lleno':'Parcial'}" style="margin-left:5px;">${statusIcon}</span>
+            </div>
           `;
       } else {
-          // Maintenance logic
-          let garageHtml = e.garage ? `<div style="margin-top:4px; font-style:italic; color:#444;">📍 ${e.garage}</div>` : "";
-          let ticketHtml = e.ticket ? `<div style="margin-top:2px;"><a href="${e.ticket}" target="_blank" style="text-decoration:none; color: #E91E63; font-weight:bold;">📄 Ver Ticket</a></div>` : "";
+          const notesText = e.notes || e.garage || "";
+          
+          let garageHtml = notesText ? `
+            <div style="margin-top:6px; font-size:0.9rem; color:#64748b; display:flex; align-items:center; gap:4px;">
+                ${icons.pin} ${notesText}
+            </div>` : "";
+          
+          let ticketHtml = "";
+          if(e.ticket) {
+              ticketHtml = `
+              <div style="margin-top:6px;">
+                <a href="${e.ticket}" target="_blank" style="text-decoration:none; color: #E91E63; font-weight:600; font-size:0.85rem; display:flex; align-items:center; gap:4px;">
+                    ${icons.ticket} Ver Ticket
+                </a>
+              </div>`;
+          } else {
+              ticketHtml = `
+              <div style="margin-top:6px;">
+                <button onclick="uploadTicketForEntry(${e._origIndex})" style="background:none; border:1px dashed #cbd5e1; border-radius:4px; padding:2px 8px; color:#64748b; font-size:0.8rem; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                    ${icons.camera} Subir Ticket
+                </button>
+              </div>`;
+          }
           
           detailsDiv.innerHTML = `
-            <strong>${e.date}</strong> — ${e.maintType}<br>
-            <span style="color:#666">${e.cost}€ (${e.odometer} km)</span>
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+                <strong style="color:#334155">${e.maintType}</strong>
+                <span style="font-size:0.85rem; color:#94a3b8; white-space:nowrap; margin-left:10px;">${e.date}</span>
+            </div>
+            <div style="color:#475569; margin-top:2px;">
+                ${e.cost}€ <span style="color:#cbd5e1">|</span> ${e.odometer} km
+            </div>
             ${garageHtml}
             ${ticketHtml}
           `;
       }
 
-      const iconDiv = document.createElement("div");
-      iconDiv.textContent = icon;
-      iconDiv.style.fontSize = "1.5rem";
-
       li.appendChild(iconDiv);
       li.appendChild(detailsDiv);
       list.appendChild(li); 
   });
+}
+
+// Nueva función para subir ticket desde historial
+async function uploadTicketForEntry(index) {
+    // Crear input file on-the-fly
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    
+    input.onchange = async () => {
+        if(input.files && input.files[0]) {
+             const m = currentVehicle.maintenanceEntries[index];
+             if(!m) return;
+             
+             try {
+                // Feedback simple (podríamos mejorar UI)
+                const oldCursor = document.body.style.cursor;
+                document.body.style.cursor = 'wait';
+                
+                const result = await uploadImage(input.files[0]);
+                
+                // Actualizar entrada
+                m.ticket = result.url;
+                await saveData(data);
+                
+                document.body.style.cursor = oldCursor;
+                renderTimeline(); // Refrescar para ver el link
+             } catch(e) {
+                 alert("Error subiendo: " + e.message);
+                 document.body.style.cursor = 'default';
+             }
+        }
+    };
+    
+    input.click();
 }
 
 function renderStats() {
@@ -340,27 +426,68 @@ function renderStats() {
         <div style="font-size:1.2rem; font-weight:bold; color:#0f172a;">${currentYearMaintCost.toFixed(2)} €</div>
     </div>`;
 
-  // Calcular consumos si hay suficientes datos
+  // Calcular consumos -> Lógica Mejorada (isFull aware)
   const fuels=[...currentVehicle.fuelEntries].sort((a,b)=>a.odometer-b.odometer);
-  if(fuels.length >= 2){ 
-      let liters=0, costSub=0; 
-      fuels.forEach(f=>{ liters+=f.liters; costSub+=f.totalCost; });
+  if(fuels.length >= 2){
+      let totalLiters = 0;
+      let totalDistance = 0;
       
-      const kmWindow = fuels[fuels.length-1].odometer - fuels[0].odometer; 
+      // Encontrar segmentos válidos entre llenados completos
+      // Estrategia: Buscar "isFull" markings.
+      // Si tengo [Full A, Partial B, Partial C, Full D], 
+      // Distancia = D.odo - A.odo
+      // Litros = B.lit + C.lit + D.lit (A.lit llena el deposito ANTES de A, no cuenta para el consumo A->D)
       
-      if(kmWindow > 0) {
-          const consumo=(liters/kmWindow)*100; 
-          const costKm=costSub/kmWindow; // Coste combustible/km
+      let lastFullIndex = -1;
+      
+      // Buscar el primer Full para empezar a contar
+      for(let i=0; i<fuels.length; i++) {
+          if(fuels[i].isFull) {
+              lastFullIndex = i;
+              break;
+          }
+      }
+      
+      if(lastFullIndex !== -1) {
+          // Recorrer desde el siguiente
+          let currentSegmentLiters = 0;
           
-          html += `
-            <div style="background:#f1f5f9; padding:10px; border-radius:8px;">
-                <div style="font-size:0.8rem; color:#64748b;">Consumo Medio</div>
-                <div style="font-size:1.2rem; font-weight:bold; color:#0f172a;">${consumo.toFixed(2)} L/100</div>
-            </div>
-            <div style="background:#f1f5f9; padding:10px; border-radius:8px;">
-                <div style="font-size:0.8rem; color:#64748b;">Coste/Km (Diesel/Gaso)</div>
-                <div style="font-size:1.2rem; font-weight:bold; color:#0f172a;">${costKm.toFixed(3)} €</div>
-            </div>`;
+          for(let i = lastFullIndex + 1; i < fuels.length; i++) {
+              const f = fuels[i];
+              currentSegmentLiters += f.liters;
+              
+              if(f.isFull) {
+                  // Cierra segmento
+                  const startOdo = fuels[lastFullIndex].odometer;
+                  const endOdo = f.odometer;
+                  const dist = endOdo - startOdo;
+                  
+                  if(dist > 0) {
+                      totalDistance += dist;
+                      totalLiters += currentSegmentLiters;
+                  }
+                  
+                  // Reset para siguiente segmento
+                  lastFullIndex = i;
+                  currentSegmentLiters = 0;
+              }
+          }
+          
+          if(totalDistance > 0) {
+              const consumo=(totalLiters/totalDistance)*100; 
+              // Usa todo el historial para coste, pero consumo solo segmentos validos
+              const costKm=totalFuelCost/(fuels[fuels.length-1].odometer - fuels[0].odometer); 
+              
+              html += `
+                <div style="background:#f1f5f9; padding:10px; border-radius:8px;">
+                    <div style="font-size:0.8rem; color:#64748b;">Consumo Medio (Real)</div>
+                    <div style="font-size:1.2rem; font-weight:bold; color:#0f172a;">${consumo.toFixed(2)} L/100</div>
+                </div>
+                <div style="background:#f1f5f9; padding:10px; border-radius:8px;">
+                    <div style="font-size:0.8rem; color:#64748b;">Coste/Km (Diesel/Gaso)</div>
+                    <div style="font-size:1.2rem; font-weight:bold; color:#0f172a;">${costKm.toFixed(3)} €</div>
+                </div>`;
+          }
       }
   }
   
