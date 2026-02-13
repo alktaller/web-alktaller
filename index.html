@@ -42,91 +42,110 @@
       </div>
     </div>
 
-    <section class="card">
-      <h2>📊 Estadísticas</h2>
-      <div id="stats"></div>
-    </section>
+    <!-- Navigation Menu -->
+    <nav class="tab-menu">
+      <button class="tab-btn active" onclick="openTab('dashboard')">📊 Resumen</button>
+      <button class="tab-btn" onclick="openTab('actions')">📝 Operaciones</button>
+      <button class="tab-btn" onclick="openTab('reminders')">⏰ Recordatorios</button>
+      <button class="tab-btn" onclick="openTab('history')">📋 Historial</button>
+    </nav>
 
-    <div class="forms-grid">
-      <!-- Sección Información del Vehículo -->
-      <section class="card" style="grid-column: 1 / -1;">
-        <h2>🚗 Información del Vehículo</h2>
-        <div class="form-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-          <div>
-            <label>Matrícula</label>
-            <input id="infoPlate" type="text" placeholder="0000 XXX" onchange="updateVehicleInfo('plate', this.value)">
-          </div>
-          <div>
-            <label>VIN (Bastidor)</label>
-            <input id="infoVin" type="text" placeholder="VIN..." onchange="updateVehicleInfo('vin', this.value)">
-          </div>
-          <div>
-            <label>Fecha Matriculación</label>
-            <input id="infoRegDate" type="date" onchange="updateVehicleInfo('regDate', this.value)">
-          </div>
-          <div>
-            <label>Fecha Compra</label>
-            <input id="infoPurchaseDate" type="date" onchange="updateVehicleInfo('purchaseDate', this.value)">
-          </div>
-          <div>
-            <label>Kilometraje Actual</label>
-            <div style="display: flex; gap: 5px;">
-              <input id="infoOdo" type="number" placeholder="km" onchange="updateVehicleOdometer(this.value)">
-              <button onclick="updateVehicleOdometer(document.getElementById('infoOdo').value)" class="btn-secondary" title="Actualizar">💾</button>
+    <!-- Tab 1: Dashboard (Stats + Vehicle Info) -->
+    <div id="dashboard" class="tab-content active">
+        <section class="card">
+          <h2>📊 Estadísticas</h2>
+          <div id="stats"></div>
+        </section>
+
+        <section class="card">
+          <h2>🚗 Información del Vehículo</h2>
+          <div class="form-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div>
+              <label>Matrícula</label>
+              <input id="infoPlate" type="text" placeholder="0000 XXX" onchange="updateVehicleInfo('plate', this.value)">
+            </div>
+            <div>
+              <label>VIN (Bastidor)</label>
+              <input id="infoVin" type="text" placeholder="VIN..." onchange="updateVehicleInfo('vin', this.value)">
+            </div>
+            <div>
+              <label>Fecha Matriculación</label>
+              <input id="infoRegDate" type="date" onchange="updateVehicleInfo('regDate', this.value)">
+            </div>
+            <div>
+              <label>Fecha Compra</label>
+              <input id="infoPurchaseDate" type="date" onchange="updateVehicleInfo('purchaseDate', this.value)">
+            </div>
+            <div>
+              <label>Kilometraje Actual</label>
+              <div style="display: flex; gap: 5px;">
+                <input id="infoOdo" type="number" placeholder="km" onchange="updateVehicleOdometer(this.value)">
+                <button onclick="updateVehicleOdometer(document.getElementById('infoOdo').value)" class="btn-secondary" title="Actualizar">💾</button>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="form-group mt-2">
-           <label>Notas</label>
-           <textarea id="infoNotes" style="width:100%; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px;" rows="2" placeholder="Notas adicionales..." onchange="updateVehicleInfo('notes', this.value)"></textarea>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>⛽ Nuevo repostaje</h2>
-        <div class="form-group">
-          <input id="fuelDate" type="date">
-          <input id="fuelOdo" type="number" placeholder="Kilómetros">
-          <input id="fuelLiters" type="number" placeholder="Litros">
-          <input id="fuelCost" type="number" placeholder="Coste total (€)">
-          <button onclick="addFuel()" class="btn-primary">Guardar repostaje</button>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>🔧 Nuevo mantenimiento</h2>
-        <div class="form-group">
-          <input id="maintDate" type="date">
-          <input id="maintType" placeholder="Tipo (aceite, frenos...)" list="maintenance-categories">
-          <input id="maintOdo" type="number" placeholder="Kilómetros">
-          <input id="maintCost" type="number" placeholder="Coste (€)">
-          <button onclick="addMaintenance()" class="btn-primary">Guardar mantenimiento</button>
-        </div>
-      </section>
+          <div class="form-group mt-2">
+             <label>Notas</label>
+             <textarea id="infoNotes" style="width:100%; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px;" rows="2" placeholder="Notas adicionales..." onchange="updateVehicleInfo('notes', this.value)"></textarea>
+          </div>
+        </section>
     </div>
 
-    <section class="card">
-      <h2>⏰ Recordatorios</h2>
-      <div class="table-responsive">
-        <table id="reminderTable">
-          <thead>
-            <tr>
-              <th>Título</th>
-              <th>Frecuencia (km)</th>
-              <th>Tiempo</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <button onclick="addReminder()" class="btn-secondary mt-2">➕ Añadir recordatorio</button>
-    </section>
+    <!-- Tab 2: Actions (Fuel + Maintenance) -->
+    <div id="actions" class="tab-content">
+        <div class="forms-grid">
+            <section class="card">
+              <h2>⛽ Nuevo repostaje</h2>
+              <div class="form-group">
+                <input id="fuelDate" type="date">
+                <input id="fuelOdo" type="number" placeholder="Kilómetros">
+                <input id="fuelLiters" type="number" placeholder="Litros">
+                <input id="fuelCost" type="number" placeholder="Coste total (€)">
+                <button onclick="addFuel()" class="btn-primary">Guardar repostaje</button>
+              </div>
+            </section>
 
-    <section class="card">
-      <h2>📋 Historial</h2>
-      <ul id="timeline"></ul>
-    </section>
+            <section class="card">
+              <h2>🔧 Nuevo mantenimiento</h2>
+              <div class="form-group">
+                <input id="maintDate" type="date">
+                <input id="maintType" placeholder="Tipo (aceite, frenos...)" list="maintenance-categories">
+                <input id="maintOdo" type="number" placeholder="Kilómetros">
+                <input id="maintCost" type="number" placeholder="Coste (€)">
+                <button onclick="addMaintenance()" class="btn-primary">Guardar mantenimiento</button>
+              </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Tab 3: Reminders -->
+    <div id="reminders" class="tab-content">
+        <section class="card">
+          <h2>⏰ Recordatorios</h2>
+          <div class="table-responsive">
+            <table id="reminderTable">
+              <thead>
+                <tr>
+                  <th>Título</th>
+                  <th>Frecuencia (km)</th>
+                  <th>Tiempo</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button onclick="addReminder()" class="btn-secondary mt-2">➕ Añadir recordatorio</button>
+        </section>
+    </div>
+
+    <!-- Tab 4: History -->
+    <div id="history" class="tab-content">
+        <section class="card">
+          <h2>📋 Historial</h2>
+          <ul id="timeline"></ul>
+        </section>
+    </div>
   </main>
 </div>
 

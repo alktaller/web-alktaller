@@ -450,3 +450,20 @@ window.startApp = start;
     document.getElementById("login-screen").classList.remove("hidden");
   }
 })();
+
+/* --- UI TABS LOGIC --- */
+function openTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    
+    const target = document.getElementById(tabId);
+    if(target) target.classList.add('active');
+    
+    // Highlight button
+    const btns = document.querySelectorAll('.tab-btn');
+    for (const btn of btns) {
+        if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabId)) {
+            btn.classList.add('active');
+        }
+    }
+}
