@@ -243,30 +243,64 @@ function renderStats() {
   
   // Usamos el odometro actual global como referencia final si existe
   const currentTotalKm = currentVehicle.currentOdometer || calculateMaxOdometer();
+  const currentYear = new Date().getFullYear();
   
+  // Calcular Costes Totales
+  let totalFuelCost = 0;
+  let totalMaintCost = 0;
+  let currentYearMaintCost = 0;
+
+  (currentVehicle.fuelEntries || []).forEach(f => totalFuelCost += (f.totalCost || 0));
+  (currentVehicle.maintenanceEntries || []).forEach(m => {
+      const c = (m.cost || 0);
+      totalMaintCost += c;
+      if(new Date(m.date).getFullYear() === currentYear) {
+          currentYearMaintCost += c;
+      }
+  });
+
+  const grandTotal = totalFuelCost + totalMaintCost;
+
+  // HTML Base
+  let html = `<div class="stats-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:1rem; text-align:center;">
+    <div style="background:#f1f5f9; padding:10px; border-radius:8px;">
+        <div style="font-size:0.8rem; color:#64748b;">Kilometraje</div>
+        <div style="font-size:1.2rem; font-weight:bold; color:#0f172a;">${currentTotalKm.toLocaleString()} km</div>
+    </div>
+    <div style="background:#f1f5f9; padding:10px; border-radius:8px;">
+        <div style="font-size:0.8rem; color:#64748b;">Gasto Total (Histórico)</div>
+        <div style="font-size:1.2rem; font-weight:bold; color:#0f172a;">${grandTotal.toFixed(2)} €</div>
+    </div>
+    <div style="background:#f1f5f9; padding:10px; border-radius:8px;">
+        <div style="font-size:0.8rem; color:#64748b;">Mantenimiento (${currentYear})</div>
+        <div style="font-size:1.2rem; font-weight:bold; color:#0f172a;">${currentYearMaintCost.toFixed(2)} €</div>
+    </div>`;
+
+  // Calcular consumos si hay suficientes datos
   const fuels=[...currentVehicle.fuelEntries].sort((a,b)=>a.odometer-b.odometer);
-  if(fuels.length<2){ 
-      div.innerHTML = `<p>KM Actuales: <b>${currentTotalKm} km</b></p><p>Faltan datos de repostaje para calcular consumos.</p>`; 
-      return; 
+  if(fuels.length >= 2){ 
+      let liters=0, costSub=0; 
+      fuels.forEach(f=>{ liters+=f.liters; costSub+=f.totalCost; });
+      
+      const kmWindow = fuels[fuels.length-1].odometer - fuels[0].odometer; 
+      
+      if(kmWindow > 0) {
+          const consumo=(liters/kmWindow)*100; 
+          const costKm=costSub/kmWindow; // Coste combustible/km
+          
+          html += `
+            <div style="background:#f1f5f9; padding:10px; border-radius:8px;">
+                <div style="font-size:0.8rem; color:#64748b;">Consumo Medio</div>
+                <div style="font-size:1.2rem; font-weight:bold; color:#0f172a;">${consumo.toFixed(2)} L/100</div>
+            </div>
+            <div style="background:#f1f5f9; padding:10px; border-radius:8px;">
+                <div style="font-size:0.8rem; color:#64748b;">Coste/Km (Diesel/Gaso)</div>
+                <div style="font-size:1.2rem; font-weight:bold; color:#0f172a;">${costKm.toFixed(3)} €</div>
+            </div>`;
+      }
   }
   
-  let liters=0, cost=0; 
-  fuels.forEach(f=>{ liters+=f.liters; cost+=f.totalCost; });
-  
-  // Distancia recorrida (usando repostajes para calculo de consumo promedio real)
-  const kmWindow = fuels[fuels.length-1].odometer - fuels[0].odometer; 
-  
-  let html = `<p>Kilometraje Actual: <b>${currentTotalKm} km</b></p>`;
-  
-  if(kmWindow > 0) {
-      const consumo=(liters/kmWindow)*100; 
-      const costKm=cost/kmWindow;
-      html += `
-        <p>Consumo medio (histórico): <b>${consumo.toFixed(2)} L/100km</b></p>
-        <p>Coste por km (combustible): <b>${costKm.toFixed(3)} €/km</b></p>
-      `;
-  }
-  
+  html += `</div>`;
   div.innerHTML=html;
 }
 
