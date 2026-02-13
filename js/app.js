@@ -51,18 +51,23 @@ function init(){
 }
 
 function renderCategoriesDatalist() {
-    let datalist = document.getElementById("maintenance-categories");
-    if(!datalist) {
-        datalist = document.createElement("datalist");
-        datalist.id = "maintenance-categories";
-        document.body.appendChild(datalist);
+    // Populate the dropdown select for new maintenance
+    let select = document.getElementById("maintTypeSelect");
+    if(select) {
+        select.innerHTML = `<option value="" disabled selected>Seleccionar Tipo...</option>`;
+        data.categories.sort().forEach(cat => {
+            const opt = document.createElement("option");
+            opt.value = cat;
+            opt.textContent = cat;
+            select.appendChild(opt);
+        });
+        
+        // Add "Other" explicitly to clear input focus
+        const other = document.createElement("option");
+        other.value = "";
+        other.textContent = "✏️ Otro (Escribir manual)...";
+        select.appendChild(other);
     }
-    datalist.innerHTML = "";
-    data.categories.sort().forEach(cat => {
-        const opt = document.createElement("option");
-        opt.value = cat;
-        datalist.appendChild(opt);
-    });
 }
 
 function checkAndAddCategory(newCat) {
@@ -435,12 +440,23 @@ function renderTimeline() {
                 </div>
              `;
          } else {
+             const categoriesOptions = data.categories.sort().map(c => `<option value="${escapeAttr(c)}">${escapeAttr(c)}</option>`).join('');
              const notesTxt = e.notes || e.garage || "";
              li.innerHTML = `
                 <div style="font-weight:bold; color:#F97316; margin-bottom:5px;">Editando Mantenimiento</div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; width:100%">
                     <input type="date" id="edit_date_${e._origIndex}" value="${escapeAttr(e.date)}" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
-                    <input type="text" id="edit_type_${e._origIndex}" value="${escapeAttr(e.maintType)}" placeholder="Tipo" list="maintenance-categories" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    
+                    <!-- Hybrid Select/Input -->
+                    <div style="display:flex; flex-direction:column; gap:2px;">
+                        <input type="text" id="edit_type_${e._origIndex}" value="${escapeAttr(e.maintType)}" placeholder="Tipo" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                        <select onchange="document.getElementById('edit_type_${e._origIndex}').value=this.value" style="padding:2px; font-size:0.8rem; background:#f8fafc; border:1px solid #ddd; border-radius:4px;">
+                            <option value="">▼ Seleccionar...</option>
+                            ${categoriesOptions}
+                            <option value="">✏️ Otro...</option>
+                        </select>
+                    </div>
+
                     <input type="number" id="edit_odo_${e._origIndex}" value="${escapeAttr(e.odometer)}" placeholder="km" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
                     <input type="number" id="edit_cost_${e._origIndex}" value="${escapeAttr(e.cost)}" placeholder="€" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
                 </div>

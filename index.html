@@ -180,8 +180,14 @@
               </h2>
               <div class="form-group">
                 <input id="maintDate" type="date">
-                <input id="maintType" placeholder="Tipo (aceite, frenos...)" list="maintenance-categories" autocomplete="off">
-                <datalist id="maintenance-categories"></datalist>
+                <!-- Select para categorías existentes y Input para nueva categoría (fallback/híbrido) -->
+                <div style="display:flex; gap:5px;">
+                    <select id="maintTypeSelect" onchange="document.getElementById('maintType').value=this.value; if(this.value==='') document.getElementById('maintType').focus();" style="flex:1;">
+                        <option value="" disabled selected>Seleccionar Tipo...</option>
+                    </select>
+                </div>
+                <input id="maintType" type="text" placeholder="O escribe otro tipo..." style="margin-top:5px;">
+                
                 <input id="maintOdo" type="number" placeholder="Kilómetros">
                 <input id="maintCost" type="number" placeholder="Coste (€)">
                 
