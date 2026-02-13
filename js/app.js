@@ -462,7 +462,7 @@ window.openTab = function(tabId) {
             btn.classList.add('active');
         }
     });
-}
+};
 
 // Initial check & Boot
 (async function boot() {
