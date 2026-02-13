@@ -336,6 +336,12 @@ function exitEditMode() {
     renderTimeline();
 }
 
+// Helper para evitar problemas con comillas y caracteres especiales en el HTML
+function escapeAttr(str) {
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/"/g, '&quot;');
+}
+
 function renderTimeline() {
   const list=document.getElementById("timeline"); list.innerHTML="";
   if(!currentVehicle) return;
@@ -344,7 +350,14 @@ function renderTimeline() {
   const fuels = currentVehicle.fuelEntries.map((e,i) => ({...e, _origIndex: i, _type: 'fuel'}));
   const maints = currentVehicle.maintenanceEntries.map((e,i) => ({...e, _origIndex: i, _type: 'maintenance'}));
 
-  const all=[...fuels, ...maints].sort((a,b) => new Date(b.date) - new Date(a.date));
+  const all=[...fuels, ...maints].sort((a,b) => {
+      const da = new Date(a.date);
+      const db = new Date(b.date);
+      // Safe sort handling invalid dates
+      if (isNaN(da)) return 1; 
+      if (isNaN(db)) return -1;
+      return db - da;
+  });
 
   // Defines SVG Icons
   const icons = {
@@ -375,10 +388,10 @@ function renderTimeline() {
              li.innerHTML = `
                 <div style="font-weight:bold; color:#3B82F6; margin-bottom:5px;">Editando Repostaje</div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; width:100%">
-                    <input type="date" id="edit_date_${e._origIndex}" value="${e.date}" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
-                    <input type="number" id="edit_odo_${e._origIndex}" value="${e.odometer}" placeholder="km" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
-                    <input type="number" id="edit_liters_${e._origIndex}" value="${e.liters}" placeholder="Litros" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
-                    <input type="number" id="edit_cost_${e._origIndex}" value="${e.totalCost}" placeholder="€" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="date" id="edit_date_${e._origIndex}" value="${escapeAttr(e.date)}" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="number" id="edit_odo_${e._origIndex}" value="${escapeAttr(e.odometer)}" placeholder="km" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="number" id="edit_liters_${e._origIndex}" value="${escapeAttr(e.liters)}" placeholder="Litros" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="number" id="edit_cost_${e._origIndex}" value="${escapeAttr(e.totalCost)}" placeholder="€" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
                 </div>
                 <div style="display:flex; align-items:center; gap:5px; margin-top:5px;">
                      <input type="checkbox" id="edit_isFull_${e._origIndex}" ${e.isFull !== false ? 'checked' : ''}>
@@ -394,12 +407,12 @@ function renderTimeline() {
              li.innerHTML = `
                 <div style="font-weight:bold; color:#F97316; margin-bottom:5px;">Editando Mantenimiento</div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; width:100%">
-                    <input type="date" id="edit_date_${e._origIndex}" value="${e.date}" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
-                    <input type="text" id="edit_type_${e._origIndex}" value="${e.maintType}" placeholder="Tipo" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
-                    <input type="number" id="edit_odo_${e._origIndex}" value="${e.odometer}" placeholder="km" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
-                    <input type="number" id="edit_cost_${e._origIndex}" value="${e.cost}" placeholder="€" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="date" id="edit_date_${e._origIndex}" value="${escapeAttr(e.date)}" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="text" id="edit_type_${e._origIndex}" value="${escapeAttr(e.maintType)}" placeholder="Tipo" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="number" id="edit_odo_${e._origIndex}" value="${escapeAttr(e.odometer)}" placeholder="km" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="number" id="edit_cost_${e._origIndex}" value="${escapeAttr(e.cost)}" placeholder="€" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
                 </div>
-                <input type="text" id="edit_notes_${e._origIndex}" value="${notesTxt}" placeholder="Notas / Taller" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; margin-top:8px;">
+                <input type="text" id="edit_notes_${e._origIndex}" value="${escapeAttr(notesTxt)}" placeholder="Notas / Taller" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; margin-top:8px;">
                 <div style="display:flex; gap:10px; margin-top:10px;">
                     <button onclick="saveInlineEntry(${e._origIndex}, 'maintenance')" style="padding:5px 10px; background:#10B981; color:white; border:none; border-radius:4px; cursor:pointer">${icons.save} Guardar</button>
                     <button onclick="exitEditMode()" style="padding:5px 10px; background:#e2e8f0; color:#475569; border:none; border-radius:4px; cursor:pointer">${icons.cancel} Cancelar</button>
