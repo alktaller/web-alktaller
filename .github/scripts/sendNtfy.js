@@ -79,6 +79,7 @@ async function main() {
         for (const r of vehicle.reminders) {
             let status = 'ok';
             let reasons = [];
+            let shouldNotify = false;
             
             // 1. Find last completion Logic
             const matches = (vehicle.maintenanceEntries || []).filter(m => 
@@ -106,9 +107,16 @@ async function main() {
                     if (remainingKm < 0) {
                          status = 'danger';
                          reasons.push(`[KM] Pasado por ${Math.abs(remainingKm)} km`);
-                    } else if (remainingKm < 1000) {
-                         if (status !== 'danger') status = 'warning';
-                         reasons.push(`[KM] Vence en ${remainingKm} km`);
+                         shouldNotify = true;
+                    } else {
+                        // Milestones for KM: 1000-900, 500-450, 100-0
+                        if ( (remainingKm <= 1000 && remainingKm >= 900) ||
+                             (remainingKm <= 500 && remainingKm >= 450) ||
+                             (remainingKm <= 100) ) { // Always warn if < 100
+                             if (status !== 'danger') status = 'warning';
+                             reasons.push(`[KM] Vence en ${remainingKm} km`);
+                             shouldNotify = true;
+                        }
                     }
                 }
             }
@@ -127,6 +135,7 @@ async function main() {
                     if (!lastDate) {
                          status = 'danger';
                          reasons.push(`[Fecha] Nunca realizado`);
+                         shouldNotify = true;
                     } else {
                         const d = new Date(lastDate);
                         d.setMonth(d.getMonth() + monthsToAdd);
@@ -141,15 +150,21 @@ async function main() {
                     if (diffDays < 0) {
                         status = 'danger';
                         reasons.push(`[Fecha] Vencido hace ${Math.abs(diffDays)} días`);
-                    } else if (diffDays < 30) {
-                        if(status !== 'danger') status = 'warning';
-                        reasons.push(`[Fecha] Vence en ${diffDays} días`);
+                        shouldNotify = true;
+                    } else {
+                        // Milestones for Date: 60, 30, 15, 7, 3, 1
+                        const milestones = [60, 30, 15, 7, 3, 1];
+                        if (milestones.includes(diffDays)) {
+                            if(status !== 'danger') status = 'warning';
+                            reasons.push(`[Fecha] Vence en ${diffDays} días`);
+                            shouldNotify = true;
+                        }
                     }
                 }
             }
 
             // 4. Send Notification
-            if (status === 'danger' || status === 'warning') {
+            if (shouldNotify && (status === 'danger' || status === 'warning')) {
                 const priority = status === 'danger' ? 'high' : 'default';
                 const tags = status === 'danger' ? 'rotating_light' : 'warning';
                 const titleStr = `${vehicle.plate || 'Coche'} - ${r.title}`;
