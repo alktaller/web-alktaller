@@ -269,13 +269,14 @@ tr.status-ok td:first-child {
 }
 
 .tab-btn:hover {
-  background-color: rgba(0, 86, 210, 0.1);
-  color: var(--primary-color);
+  background-color: rgba(255, 140, 0, 0.1);
+  color: var(--accent-color);
 }
 
 .tab-btn.active {
-  background-color: var(--primary-color);
-  color: white;
+  background-color: transparent;
+  color: var(--accent-color);
+  border-bottom: 2px solid var(--accent-color);
 }
 
 /* Tab Content */
