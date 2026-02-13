@@ -1,4 +1,5 @@
 let data; let currentVehicle;
+let editState = null; // { type: 'fuel'|'maintenance', index: number }
 
 const DEFAULT_CATEGORIES = [
   "Filtro Aire", "Filtro Aceite", "Aceite Motor", "Líquido de Frenos",
@@ -184,7 +185,15 @@ async function addFuel() {
       isFull: isFullEl ? isFullEl.checked : true
   };
   
-  currentVehicle.fuelEntries.push(entry); 
+  if (editState && editState.type === 'fuel') {
+      // Update existing
+      currentVehicle.fuelEntries[editState.index] = entry;
+      exitEditMode();
+  } else {
+      // Add new
+      currentVehicle.fuelEntries.push(entry); 
+  }
+
   checkAndUpdateOdometer(entry.odometer); // Auto-actualizar KMs globales
   
   // Limpiar formulario
@@ -209,6 +218,12 @@ async function addMaintenance() {
 
   // Upload Logic
   let ticketUrl = null;
+  // If editing and no new file, keep old ticket
+  if(editState && editState.type === 'maintenance') {
+      const oldEntry = currentVehicle.maintenanceEntries[editState.index];
+      if(oldEntry) ticketUrl = oldEntry.ticket;
+  }
+
   if(ticketEl.files && ticketEl.files[0]) {
       try {
           // Visual feedback
@@ -238,13 +253,19 @@ async function addMaintenance() {
       maintType: typeEl.value, 
       odometer: Number(odoEl.value), 
       cost: Number(costEl.value),
-      notes: garageEl ? garageEl.value : "",
-      ticket: ticketUrl
+      notes: garageEl ? garageEl.value : "", // Save to notes for compatibility
+      ticket: ticketUrl // New URL or old URL
   };
   
   checkAndAddCategory(entry.maintType);
 
-  currentVehicle.maintenanceEntries.push(entry); 
+  if (editState && editState.type === 'maintenance') {
+      currentVehicle.maintenanceEntries[editState.index] = entry;
+      exitEditMode();
+  } else {
+      currentVehicle.maintenanceEntries.push(entry); 
+  }
+
   checkAndUpdateOdometer(entry.odometer); // Auto-actualizar KMs globales
   
    // Limpiar formulario
@@ -274,13 +295,15 @@ function renderTimeline() {
       ticket: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:text-bottom"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`,
       camera: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:text-bottom"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`,
       check: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:#10B981; vertical-align:text-bottom"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
-      alert: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:#F59E0B; vertical-align:text-bottom"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`
+      alert: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:#F59E0B; vertical-align:text-bottom"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`,
+      edit: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`,
+      trash: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#E11D48"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`
   };
 
   all.forEach(e => { 
       const li = document.createElement("li");
       li.className = "timeline-item";
-      li.style.cssText = "padding: 12px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: flex-start; gap: 15px;";
+      li.style.cssText = "padding: 12px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: flex-start; gap: 15px; position: relative;";
 
       // Main Icon Container
       const iconDiv = document.createElement("div");
@@ -294,6 +317,8 @@ function renderTimeline() {
 
       const detailsDiv = document.createElement("div");
       detailsDiv.style.flex = "1";
+      // Ensure padding right to avoid overlap with actions
+      detailsDiv.style.paddingRight = "60px";
 
       if(e.type === "fuel") {
           const statusIcon = e.isFull ? icons.check : icons.alert;
@@ -345,8 +370,18 @@ function renderTimeline() {
           `;
       }
 
+      // Actions Div (Absolute top right)
+      const actionsDiv = document.createElement("div");
+      actionsDiv.style.cssText = "position:absolute; top:12px; right:10px; display:flex; gap:8px;";
+      
+      actionsDiv.innerHTML = `
+        <button onclick="editEntry(${e._origIndex}, '${e._type}')" title="Editar" style="background:none; border:none; cursor:pointer; padding:2px;">${icons.edit}</button>
+        <button onclick="deleteEntry(${e._origIndex}, '${e._type}')" title="Borrar" style="background:none; border:none; cursor:pointer; padding:2px;">${icons.trash}</button>
+      `;
+
       li.appendChild(iconDiv);
       li.appendChild(detailsDiv);
+      li.appendChild(actionsDiv);
       list.appendChild(li); 
   });
 }
