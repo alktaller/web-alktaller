@@ -62,6 +62,18 @@ function updateSettings(key, value) {
     saveData(data);
 }
 
+function toggleConfig() {
+    const el = document.getElementById("configPanel");
+    if(el) {
+        if (el.style.display === "none") {
+            el.style.display = "block";
+            el.scrollIntoView({behavior: "smooth"});
+        } else {
+            el.style.display = "none";
+        }
+    }
+}
+
 function renderCategoriesDatalist() {
     // Populate the dropdown select for new maintenance
     let select = document.getElementById("maintTypeSelect");
