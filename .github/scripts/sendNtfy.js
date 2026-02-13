@@ -167,7 +167,12 @@ async function main() {
             if (shouldNotify && (status === 'danger' || status === 'warning')) {
                 const priority = status === 'danger' ? 'high' : 'default';
                 const tags = status === 'danger' ? 'rotating_light' : 'warning';
-                const titleStr = `${vehicle.plate || 'Coche'} - ${r.title}`;
+                
+                // Use Name or Brand/Model, avoiding Plate for privacy
+                let vehName = vehicle.name || `${vehicle.brand} ${vehicle.model}`.trim();
+                if (!vehName || vehName === 'undefined undefined') vehName = 'Mi Coche';
+                
+                const titleStr = `${vehName} - ${r.title}`;
                 const bodyStr = `Estado: ${status.toUpperCase()}\n\n${reasons.join('\n')}`;
 
                 console.log(`Sending notification to topic '${topic}': ${titleStr}`);
