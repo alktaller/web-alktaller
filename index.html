@@ -146,6 +146,13 @@
              <label>Notas</label>
              <textarea id="infoNotes" style="width:100%; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px;" rows="2" placeholder="Notas adicionales..." onchange="updateVehicleInfo('notes', this.value)"></textarea>
           </div>
+          
+          <div class="form-group mt-2" style="text-align: right;">
+              <button onclick="exportVehiclePDF()" class="btn-secondary" style="border: 1px solid var(--border-color);">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                Exportar Informe PDF
+              </button>
+          </div>
         </section>
     </div>
 
@@ -246,8 +253,11 @@
   </main>
 </div>
 
-<script src="js/storage.js?v=7"></script>
-<script src="js/app.js?v=7"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+<script src="js/storage.js?v=8"></script>
+<script src="js/app.js?v=8"></script>
 
 </body>
 </html>

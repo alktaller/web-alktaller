@@ -891,6 +891,170 @@ window.openTab = function(tabId) {
     });
 };
 
+// --- EXPORT PDF FEATURE ---
+async function exportVehiclePDF() {
+  if(!currentVehicle) return;
+  const { jsPDF } = window.jspdf;
+  if (!jsPDF) {
+      alert("Error: Librería PDF no cargada. Revisa tu conexión a internet.");
+      return;
+  }
+
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  
+  // --- HEADER ---
+  doc.setFontSize(22);
+  doc.setTextColor(40);
+  doc.text("Informe de Vehículo", pageWidth/2, 20, { align: 'center' });
+  
+  doc.setFontSize(16);
+  doc.setTextColor(60);
+  doc.text(`${currentVehicle.brand || ''} ${currentVehicle.model || 'Vehículo'} (${currentVehicle.plate || 'S/M'})`, pageWidth/2, 30, { align: 'center' });
+
+  // --- INFO BLOCK ---
+  doc.setFontSize(12);
+  doc.setTextColor(0);
+  doc.setDrawColor(200);
+  doc.line(14, 35, pageWidth-14, 35);
+
+  let yPos = 45;
+  const leftX = 14;
+  const rightX = pageWidth / 2 + 10;
+  
+  doc.setFontSize(10);
+  doc.text(`Matrícula: ${currentVehicle.plate || '-'}`, leftX, yPos);
+  doc.text(`VIN: ${currentVehicle.vin || '-'}`, rightX, yPos);
+  yPos += 7;
+  doc.text(`Fecha Compra: ${currentVehicle.purchaseDate || '-'}`, leftX, yPos);
+  doc.text(`Fecha Matriculación: ${currentVehicle.regDate || '-'}`, rightX, yPos);
+  yPos += 7;
+  
+  // Calculate Stats again for PDF
+  const currentTotalKm = currentVehicle.currentOdometer || calculateMaxOdometer();
+  let totalFuelCost = 0;
+  let totalMaintCost = 0;
+  (currentVehicle.fuelEntries || []).forEach(f => totalFuelCost += (f.totalCost || 0));
+  (currentVehicle.maintenanceEntries || []).forEach(m => totalMaintCost += (m.cost || 0));
+  
+  doc.text(`Kilometraje Actual: ${currentTotalKm.toLocaleString()} km`, leftX, yPos);
+  doc.text(`Gasto Total: ${(totalFuelCost + totalMaintCost).toFixed(2)} €`, rightX, yPos);
+  yPos += 15;
+
+  // --- STATS SUMMARY ---
+  doc.setFontSize(14);
+  doc.text("Resumen de Estadísticas", 14, yPos);
+  yPos += 5;
+  doc.setLineWidth(0.5);
+  doc.line(14, yPos, pageWidth-14, yPos);
+  yPos += 10;
+  
+  // Calculate consumption logic simplified for PDF summary
+  const fuels=[...currentVehicle.fuelEntries].sort((a,b)=>a.odometer-b.odometer);
+  let consumptionText = "N/A";
+  let costKmText = "N/A";
+
+  if(fuels.length >= 2){
+      let totalLiters = 0;
+      let totalDistance = 0;
+      let lastFullIndex = -1;
+      
+      for(let i=0; i<fuels.length; i++) {
+          if(fuels[i].isFull) {
+              lastFullIndex = i;
+              break;
+          }
+      }
+      if(lastFullIndex !== -1) {
+          let currentSegmentLiters = 0;
+          for(let i = lastFullIndex + 1; i < fuels.length; i++) {
+              const f = fuels[i];
+              currentSegmentLiters += f.liters;
+              if(f.isFull) {
+                  const dist = f.odometer - fuels[lastFullIndex].odometer;
+                  if(dist > 0) {
+                      totalDistance += dist;
+                      totalLiters += currentSegmentLiters;
+                  }
+                  lastFullIndex = i;
+                  currentSegmentLiters = 0;
+              }
+          }
+          if(totalDistance > 0) {
+              consumptionText = ((totalLiters/totalDistance)*100).toFixed(2) + " L/100";
+          }
+          if(fuels[fuels.length-1].odometer - fuels[0].odometer > 0) {
+             const costKm=totalFuelCost/(fuels[fuels.length-1].odometer - fuels[0].odometer);
+             costKmText = costKm.toFixed(3) + " €/km";
+          }
+      }
+  }
+
+  const statsData = [
+      ["Kilómetros Totales", `${currentTotalKm} km`],
+      ["Gasto Combustible", `${totalFuelCost.toFixed(2)} €`],
+      ["Gasto Mantenimiento", `${totalMaintCost.toFixed(2)} €`],
+      ["Consumo Medio", consumptionText],
+      ["Coste por Km", costKmText]
+  ];
+
+  doc.autoTable({
+      startY: yPos,
+      head: [['Métrica', 'Valor']],
+      body: statsData,
+      theme: 'striped',
+      headStyles: { fillColor: [41, 128, 185] },
+      margin: { top: 10 }
+  });
+
+  yPos = doc.lastAutoTable.finalY + 15;
+
+  // --- HISTORY TABLE ---
+  doc.setFontSize(14);
+  doc.text("Historial Detallado", 14, yPos);
+  yPos += 5;
+  doc.line(14, yPos, pageWidth-14, yPos);
+  yPos += 5;
+
+  // Merge and sort Entries
+  const fEntries = currentVehicle.fuelEntries.map(e => ({
+      date: e.date,
+      type: 'Repostaje', 
+      desc: `${e.liters}L (${e.isFull?'Lleno':'Parcial'})`, 
+      odo: e.odometer, 
+      cost: e.totalCost
+  }));
+  const mEntries = currentVehicle.maintenanceEntries.map(e => ({
+      date: e.date,
+      type: 'Mantenimiento', 
+      desc: `${e.maintType} - ${e.notes || ''}`, 
+      odo: e.odometer, 
+      cost: e.cost
+  }));
+
+  const history = [...fEntries, ...mEntries].sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  const tableBody = history.map(h => [
+      h.date,
+      h.type,
+      h.desc,
+      h.odo.toLocaleString(),
+      h.cost.toFixed(2) + " €"
+  ]);
+
+  doc.autoTable({
+      startY: yPos,
+      head: [['Fecha', 'Tipo', 'Detalle', 'Odómetro', 'Coste']],
+      body: tableBody,
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [52, 73, 94] }
+  });
+
+  // Save
+  doc.save(`Informe_${currentVehicle.plate || 'Vehiculo'}_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
 // Initial check & Boot
 async function initApp() {
   try {
