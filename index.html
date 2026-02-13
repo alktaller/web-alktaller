@@ -119,6 +119,28 @@
                 <button onclick="updateVehicleOdometer(document.getElementById('infoOdo').value)" class="btn-secondary" title="Actualizar">💾</button>
               </div>
             </div>
+            <div>
+              <label>Compañía Seguros</label>
+              <input id="infoInsuranceCompany" type="text" placeholder="Compañía..." onchange="updateVehicleInfo('insuranceCompany', this.value)">
+            </div>
+            <div>
+              <label>Nº Póliza</label>
+              <input id="infoInsurancePolicy" type="text" placeholder="Póliza..." onchange="updateVehicleInfo('insurancePolicy', this.value)">
+            </div>
+            <div style="grid-column: 1 / -1;">
+                <label>Documento Póliza</label>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <a id="linkViewPolicy" href="#" target="_blank" class="btn-secondary" style="display:none; text-decoration:none; display:flex; align-items:center; gap:5px;">
+                       📄 Ver Póliza
+                    </a>
+                    <label for="infoInsuranceFile" class="btn-secondary" style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        Subir/Cambiar Foto
+                    </label>
+                    <input id="infoInsuranceFile" type="file" accept="image/*,application/pdf" onchange="uploadVehiclePolicy(this)" style="display:none;">
+                    <span id="uploadStatus" style="font-size:0.85rem; color:#64748b;"></span>
+                </div>
+            </div>
           </div>
           <div class="form-group mt-2">
              <label>Notas</label>
@@ -217,8 +239,8 @@
   </main>
 </div>
 
-<script src="js/storage.js?v=4"></script>
-<script src="js/app.js?v=4"></script>
+<script src="js/storage.js?v=5"></script>
+<script src="js/app.js?v=5"></script>
 
 </body>
 </html>

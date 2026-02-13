@@ -101,11 +101,43 @@ function renderVehicleInfo() {
   document.getElementById("infoPurchaseDate").value = currentVehicle.purchaseDate || "";
   document.getElementById("infoNotes").value = currentVehicle.notes || "";
   
+  // Seguros
+  document.getElementById("infoInsuranceCompany").value = currentVehicle.insuranceCompany || "";
+  document.getElementById("infoInsurancePolicy").value = currentVehicle.insurancePolicy || "";
+
+  const linkPolicy = document.getElementById("linkViewPolicy");
+  if (linkPolicy) {
+      if(currentVehicle.insuranceFile) {
+          linkPolicy.href = currentVehicle.insuranceFile;
+          linkPolicy.style.display = "inline-flex"; 
+          linkPolicy.innerHTML = `📄 Ver Póliza`;
+      } else {
+          linkPolicy.style.display = "none";
+      }
+  }
+
   // Kilometraje: Si no tiene campo propio, usamos el calculado, y lo guardamos
   if (currentVehicle.currentOdometer === undefined) {
       currentVehicle.currentOdometer = calculateMaxOdometer();
   }
   document.getElementById("infoOdo").value = currentVehicle.currentOdometer;
+}
+
+async function uploadVehiclePolicy(input) {
+    if(!currentVehicle) return;
+    if(input.files && input.files[0]) {
+        try {
+            document.getElementById('uploadStatus').textContent = "Subiendo...";
+            const result = await uploadImage(input.files[0]);
+            currentVehicle.insuranceFile = result.url;
+            await saveData(data);
+            document.getElementById('uploadStatus').textContent = "✅ Guardado";
+            renderVehicleInfo();
+        } catch(e) {
+            alert("Error subiendo: " + e.message);
+            document.getElementById('uploadStatus').textContent = "Error";
+        }
+    }
 }
 
 async function updateVehicleInfo(field, value) {
