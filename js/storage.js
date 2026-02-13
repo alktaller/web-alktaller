@@ -132,4 +132,44 @@ async function saveData(data) {
   }
 }
 
+async function uploadImage(file) {
+    const token = getToken();
+    if (!token) throw new Error("No token");
+
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = async () => {
+            try {
+                // Remove 'data:image/xyz;base64,' prefix
+                const base64Content = reader.result.split(',')[1];
+                
+                // Generate secure filename
+                const datePrefix = new Date().toISOString().replace(/[:.]/g, '-');
+                const cleanName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+                const path = `tickets/${datePrefix}_${cleanName}`;
+                
+                const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${path}`;
+                
+                const res = await fetch(url, {
+                    method: "PUT",
+                    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+                    body: JSON.stringify({
+                        message: `Upload ticket ${cleanName}`,
+                        content: base64Content
+                    })
+                });
+
+                if (!res.ok) throw new Error("GitHub Upload Failed");
+                
+                const json = await res.json();
+                resolve({ path: path, url: json.content.html_url, download_url: json.content.download_url });
+            } catch (err) {
+                reject(err);
+            }
+        };
+        reader.onerror = error => reject(error);
+    });
+}
+
 // Init Check -> No necesitamos autodetect config

@@ -199,15 +199,44 @@ async function addMaintenance() {
   const typeEl = document.getElementById('maintType');
   const odoEl = document.getElementById('maintOdo');
   const costEl = document.getElementById('maintCost');
+  const garageEl = document.getElementById('maintGarage');
+  const ticketEl = document.getElementById('maintTicket');
 
   if(!dateEl.value || !typeEl.value) { alert("Fecha y Tipo son obligatorios"); return; }
+
+  // Upload Logic
+  let ticketUrl = null;
+  if(ticketEl.files && ticketEl.files[0]) {
+      try {
+          // Visual feedback
+          const btn = document.querySelector('button[onclick="addMaintenance()"]');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = "Subiendo ticket... ⏳";
+          btn.disabled = true;
+
+          const result = await uploadImage(ticketEl.files[0]);
+          ticketUrl = result.url; // Use html_url for easy viewing
+          
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+      } catch(e) {
+          alert("Error al subir la imagen: " + e.message);
+          // Restore button
+          const btn = document.querySelector('button[onclick="addMaintenance()"]');
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          return; // Stop saving if upload failed
+      }
+  }
 
   const entry={ 
       type:"maintenance", 
       date: dateEl.value, 
       maintType: typeEl.value, 
       odometer: Number(odoEl.value), 
-      cost: Number(costEl.value)
+      cost: Number(costEl.value),
+      garage: garageEl ? garageEl.value : "",
+      ticket: ticketUrl
   };
   
   checkAndAddCategory(entry.maintType);
@@ -217,6 +246,8 @@ async function addMaintenance() {
   
    // Limpiar formulario
    dateEl.value = ""; typeEl.value = ""; odoEl.value = ""; costEl.value = "";
+   if(garageEl) garageEl.value = "";
+   if(ticketEl) ticketEl.value = "";
 
   renderTimeline(); renderStats();
   await saveData(data);
@@ -226,12 +257,45 @@ function renderTimeline() {
   const list=document.getElementById("timeline"); list.innerHTML="";
   if(!currentVehicle) return;
   
-  const all=[...currentVehicle.fuelEntries,...currentVehicle.maintenanceEntries].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  all.forEach(e=>{ 
-      const li=document.createElement("li"); 
-      li.textContent=e.type==="fuel"
-          ? `⛽ ${e.date} — ${e.liters}L — ${e.totalCost}€ (${e.odometer} km)`
-          : `🔧 ${e.date} — ${e.maintType} — ${e.cost}€ (${e.odometer} km)`; 
+  // Combine and sort entries
+  const all=[...currentVehicle.fuelEntries, ...currentVehicle.maintenanceEntries]
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  all.forEach(e => { 
+      const li = document.createElement("li");
+      li.className = "timeline-item"; // Add class for styling
+      li.style.cssText = "padding: 10px; border-bottom: 1px solid #eee; display: flex; align-items: flex-start; gap: 10px;";
+
+      // Icon based on type
+      const icon = e.type === "fuel" ? "⛽" : "🔧";
+      
+      const detailsDiv = document.createElement("div");
+      detailsDiv.style.flex = "1";
+
+      if(e.type === "fuel") {
+          detailsDiv.innerHTML = `
+            <strong>${e.date}</strong> — Repostaje<br>
+            <span style="color:#666">${e.liters}L — ${e.totalCost}€ (${e.odometer} km)</span>
+          `;
+      } else {
+          // Maintenance logic
+          let garageHtml = e.garage ? `<br><small>🏪 ${e.garage}</small>` : "";
+          let ticketHtml = e.ticket ? `<a href="${e.ticket}" target="_blank" style="text-decoration:none; margin-left:10px;">📄 Ver Ticket</a>` : "";
+          
+          detailsDiv.innerHTML = `
+            <strong>${e.date}</strong> — ${e.maintType}<br>
+            <span style="color:#666">${e.cost}€ (${e.odometer} km)</span>
+            ${garageHtml}
+            ${ticketHtml}
+          `;
+      }
+
+      const iconDiv = document.createElement("div");
+      iconDiv.textContent = icon;
+      iconDiv.style.fontSize = "1.5rem";
+
+      li.appendChild(iconDiv);
+      li.appendChild(detailsDiv);
       list.appendChild(li); 
   });
 }

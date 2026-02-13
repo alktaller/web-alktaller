@@ -157,7 +157,14 @@
                 <input id="maintType" placeholder="Tipo (aceite, frenos...)" list="maintenance-categories">
                 <input id="maintOdo" type="number" placeholder="Kilómetros">
                 <input id="maintCost" type="number" placeholder="Coste (€)">
-                <button onclick="addMaintenance()" class="btn-primary">
+                
+                <input id="maintGarage" type="text" placeholder="Notas / Taller (¿Dónde se realizó?)">
+                <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+                    <label style="font-size:0.9rem; color:var(--text-color);">🧾 Ticket:</label>
+                    <input id="maintTicket" type="file" accept="image/*" style="flex:1;">
+                </div>
+
+                <button onclick="addMaintenance()" class="btn-primary" style="margin-top:10px;">
                     <svg class="icon" viewBox="0 0 24 24" style="stroke:white"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v13a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                     Guardar mantenimiento
                 </button>
