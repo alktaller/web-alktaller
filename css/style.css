@@ -97,6 +97,21 @@ header {
   margin-bottom: 2rem;
 }
 
+.user-area {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Mobile Header Config */
+@media (max-width: 600px) {
+  header { padding: 0.8rem 1rem; }
+  header h1 { font-size: 1.1rem; }
+  .user-area .btn-secondary { padding: 0.5rem; }
+  .user-area .btn-secondary .btn-text { display: none; }
+  .user-area .icon { margin-right: 0; }
+}
+
 .logo-area {
   display: flex;
   align-items: center;
