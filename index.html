@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Car Manager</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<h1>🚗 Car Manager</h1>
+
+<select id="vehicleSelect"></select>
+<button onclick="addVehicle()">➕ Añadir coche</button>
+<button onclick="logout()">🚪 Salir</button>
+<button onclick="saveData(data)">💾 Guardar en GitHub</button>
+
+<section>
+  <h2>📊 Estadísticas</h2>
+  <div id="stats"></div>
+</section>
+
+<section>
+  <h2>⛽ Nuevo repostaje</h2>
+  <input id="fuelDate" type="date">
+  <input id="fuelOdo" type="number" placeholder="Kilómetros">
+  <input id="fuelLiters" type="number" placeholder="Litros">
+  <input id="fuelCost" type="number" placeholder="Coste total (€)">
+  <button onclick="addFuel()">Guardar repostaje</button>
+</section>
+
+<section>
+  <h2>🔧 Nuevo mantenimiento</h2>
+  <input id="maintDate" type="date">
+  <input id="maintType" placeholder="Tipo (aceite, frenos...)">
+  <input id="maintOdo" type="number" placeholder="Kilómetros">
+  <input id="maintCost" type="number" placeholder="Coste (€)">
+  <button onclick="addMaintenance()">Guardar mantenimiento</button>
+</section>
+
+<section>
+  <h2>⏰ Recordatorios</h2>
+  <table id="reminderTable">
+    <thead>
+      <tr>
+        <th>Título</th>
+        <th>Frecuencia (km)</th>
+        <th>Frecuencia (días)</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <button onclick="addReminder()">➕ Añadir recordatorio</button>
+</section>
+
+<section>
+  <h2>📋 Timeline</h2>
+  <ul id="timeline"></ul>
+</section>
+
+<script src="js/storage.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

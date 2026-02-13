@@ -1,0 +1,20 @@
+name: Recordatorios coche
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  update-calendar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with: { node-version: 20 }
+      - run: npm install googleapis@105 node-fetch@3
+      - name: Crear/Actualizar recordatorios en Google Calendar
+        env:
+          GOOGLE_CALENDAR_CREDENTIALS: ${{ secrets.GOOGLE_CALENDAR_CREDENTIALS }}
+          CALENDAR_ID: "primary"
+        run: node .github/scripts/updateCalendar.js

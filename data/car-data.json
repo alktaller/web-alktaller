@@ -1,0 +1,11 @@
+{
+  "vehicles":[
+    {
+      "id":"car1",
+      "name":"Mi coche",
+      "fuelEntries":[],
+      "maintenanceEntries":[],
+      "reminders":[]
+    }
+  ]
+}
