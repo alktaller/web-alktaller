@@ -185,14 +185,8 @@ async function addFuel() {
       isFull: isFullEl ? isFullEl.checked : true
   };
   
-  if (editState && editState.type === 'fuel') {
-      // Update existing
-      currentVehicle.fuelEntries[editState.index] = entry;
-      exitEditMode();
-  } else {
-      // Add new
-      currentVehicle.fuelEntries.push(entry); 
-  }
+  // Add new
+  currentVehicle.fuelEntries.push(entry); 
 
   checkAndUpdateOdometer(entry.odometer); // Auto-actualizar KMs globales
   
@@ -259,12 +253,7 @@ async function addMaintenance() {
   
   checkAndAddCategory(entry.maintType);
 
-  if (editState && editState.type === 'maintenance') {
-      currentVehicle.maintenanceEntries[editState.index] = entry;
-      exitEditMode();
-  } else {
-      currentVehicle.maintenanceEntries.push(entry); 
-  }
+  currentVehicle.maintenanceEntries.push(entry); 
 
   checkAndUpdateOdometer(entry.odometer); // Auto-actualizar KMs globales
   
@@ -275,6 +264,76 @@ async function addMaintenance() {
 
   renderTimeline(); renderStats();
   await saveData(data);
+}
+
+// --- EDIT / DELETE HELPERS ---
+function deleteEntry(typeIndex, typeType) {
+    if(!confirm("¿Estás seguro de eliminar este registro?")) return;
+    
+    // typeIndex comes from _origIndex
+    if(typeType === 'fuel') {
+        currentVehicle.fuelEntries.splice(typeIndex, 1);
+    } else {
+        currentVehicle.maintenanceEntries.splice(typeIndex, 1);
+    }
+    
+    saveData(data);
+    renderTimeline();
+    renderStats();
+}
+
+function editEntry(index, type) {
+    editState = { type, index };
+    renderTimeline(); // Re-render to show inline form
+}
+
+function saveInlineEntry(index, type) {
+    let entry;
+    // Helper to get value securely
+    const val = (id) => document.getElementById(id).value;
+    const num = (id) => Number(document.getElementById(id).value);
+
+    try {
+        if(type === 'fuel') {
+            if(!val(`edit_date_${index}`) || !val(`edit_odo_${index}`)) throw new Error("Fecha y KM requeridos");
+            entry = {
+                type: 'fuel',
+                date: val(`edit_date_${index}`),
+                odometer: num(`edit_odo_${index}`),
+                liters: num(`edit_liters_${index}`),
+                totalCost: num(`edit_cost_${index}`),
+                isFull: document.getElementById(`edit_isFull_${index}`).checked
+            };
+            currentVehicle.fuelEntries[index] = entry;
+
+        } else {
+            if(!val(`edit_date_${index}`) || !val(`edit_type_${index}`)) throw new Error("Fecha y Tipo requeridos");
+            // Preserve ticket if not changed (no upload in inline edit for now, just keep old)
+            const oldEntry = currentVehicle.maintenanceEntries[index];
+            entry = {
+                type: 'maintenance',
+                date: val(`edit_date_${index}`),
+                maintType: val(`edit_type_${index}`),
+                odometer: num(`edit_odo_${index}`),
+                cost: num(`edit_cost_${index}`),
+                notes: val(`edit_notes_${index}`),
+                ticket: oldEntry.ticket // Keep existing ticket
+            };
+            currentVehicle.maintenanceEntries[index] = entry;
+        }
+
+        checkAndUpdateOdometer(entry.odometer);
+        saveData(data);
+        exitEditMode();
+
+    } catch(e) {
+        alert(e.message);
+    }
+}
+
+function exitEditMode() {
+    editState = null;
+    renderTimeline();
 }
 
 function renderTimeline() {
@@ -297,7 +356,9 @@ function renderTimeline() {
       check: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:#10B981; vertical-align:text-bottom"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
       alert: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:#F59E0B; vertical-align:text-bottom"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`,
       edit: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`,
-      trash: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#E11D48"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`
+      trash: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#E11D48"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
+      save: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#10B981"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v13a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>`,
+      cancel: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`
   };
 
   all.forEach(e => { 
@@ -305,6 +366,51 @@ function renderTimeline() {
       li.className = "timeline-item";
       li.style.cssText = "padding: 12px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: flex-start; gap: 15px; position: relative;";
 
+      // --- INLINE EDIT MODE ---
+      if (editState && editState.index === e._origIndex && editState.type === e._type) {
+         li.style.flexDirection = "column";
+         li.style.gap = "8px";
+         
+         if (e._type === 'fuel') {
+             li.innerHTML = `
+                <div style="font-weight:bold; color:#3B82F6; margin-bottom:5px;">Editando Repostaje</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; width:100%">
+                    <input type="date" id="edit_date_${e._origIndex}" value="${e.date}" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="number" id="edit_odo_${e._origIndex}" value="${e.odometer}" placeholder="km" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="number" id="edit_liters_${e._origIndex}" value="${e.liters}" placeholder="Litros" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="number" id="edit_cost_${e._origIndex}" value="${e.totalCost}" placeholder="€" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; margin-top:5px;">
+                     <input type="checkbox" id="edit_isFull_${e._origIndex}" ${e.isFull !== false ? 'checked' : ''}>
+                     <label for="edit_isFull_${e._origIndex}">Lleno</label>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button onclick="saveInlineEntry(${e._origIndex}, 'fuel')" style="padding:5px 10px; background:#10B981; color:white; border:none; border-radius:4px; cursor:pointer">${icons.save} Guardar</button>
+                    <button onclick="exitEditMode()" style="padding:5px 10px; background:#e2e8f0; color:#475569; border:none; border-radius:4px; cursor:pointer">${icons.cancel} Cancelar</button>
+                </div>
+             `;
+         } else {
+             const notesTxt = e.notes || e.garage || "";
+             li.innerHTML = `
+                <div style="font-weight:bold; color:#F97316; margin-bottom:5px;">Editando Mantenimiento</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; width:100%">
+                    <input type="date" id="edit_date_${e._origIndex}" value="${e.date}" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="text" id="edit_type_${e._origIndex}" value="${e.maintType}" placeholder="Tipo" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="number" id="edit_odo_${e._origIndex}" value="${e.odometer}" placeholder="km" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="number" id="edit_cost_${e._origIndex}" value="${e.cost}" placeholder="€" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                </div>
+                <input type="text" id="edit_notes_${e._origIndex}" value="${notesTxt}" placeholder="Notas / Taller" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; margin-top:8px;">
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button onclick="saveInlineEntry(${e._origIndex}, 'maintenance')" style="padding:5px 10px; background:#10B981; color:white; border:none; border-radius:4px; cursor:pointer">${icons.save} Guardar</button>
+                    <button onclick="exitEditMode()" style="padding:5px 10px; background:#e2e8f0; color:#475569; border:none; border-radius:4px; cursor:pointer">${icons.cancel} Cancelar</button>
+                </div>
+             `;
+         }
+         list.appendChild(li);
+         return; // Skip normal rendering
+      }
+
+      // --- NORMAL RENDER (unchanged logic) ---
       // Main Icon Container
       const iconDiv = document.createElement("div");
       iconDiv.style.cssText = `

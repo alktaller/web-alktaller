@@ -92,7 +92,23 @@ async function loadData() {
   }
 }
 
+let isSaving = false;
+let pendingSaveData = null;
+
 async function saveData(data) {
+  if (isSaving) {
+      console.log("Guardado en curso, encolando siguiente petición...");
+      pendingSaveData = data;
+      return;
+  }
+
+  isSaving = true;
+  // Limpiamos pendiente al empezar, pero si entra otra durante el await, se rellenará
+  // NOTA: Si pendingSaveData ya tenía algo, lo estamos procesando ahora (data), 
+  // así que lo nullificamos. Sin embargo, en la recursión pasamos pendingSaveData como data.
+  // Lo importante es limpiar la variable global para que acumule NUEVAS peticiones.
+  pendingSaveData = null; 
+
   const token = getToken();
   const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`;
   
@@ -117,18 +133,27 @@ async function saveData(data) {
     if (!res.ok) {
        const err = await res.json().catch(()=>({}));
        console.error("Error GitHub:", err);
-       alert(`Error al guardar: ${err.message || res.statusText}`); 
-       return; 
+       // Si es mismatch de SHA, esperar que recargue o gestione error
+       alert(`Error al guardar: ${err.message || res.statusText}\nRecarga la página si persisten los problemas.`); 
+    } else {
+       const result = await res.json();
+       githubSha = result.content.sha;
+       console.log("Guardado exitosamente", githubSha);
     }
-    
-    const result = await res.json();
-    githubSha = result.content.sha;
-    console.log("Guardado exitosamente", githubSha);
   } catch(e) {
     console.error(e);
     alert("Error de red al guardar");
   } finally {
     document.body.style.cursor = oldText;
+    isSaving = false;
+    
+    // Si llegó una nueva petición mientras guardábamos, la ejecutamos ahora
+    if (pendingSaveData) {
+        const nextData = pendingSaveData;
+        pendingSaveData = null; // Evitar bucles infinitos locales, aunque la recursión maneja su propio scope
+        // Usamos setTimeout para salir del stack actual y dejar respirar al navegador
+        setTimeout(() => saveData(nextData), 100);
+    }
   }
 }
 
