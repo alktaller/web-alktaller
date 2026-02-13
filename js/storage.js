@@ -18,9 +18,17 @@ async function validateToken(token) {
     const res = await fetch("https://api.github.com/user", {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" }
     });
-    return res.ok;
+    
+    if (!res.ok) {
+       console.error("Token validation failed:", res.status, res.statusText);
+       return { valid: false, reason: `GitHub API error: ${res.status} ${res.statusText}` };
+    }
+    
+    const user = await res.json();
+    return { valid: true, login: user.login };
   } catch (e) {
-    return false;
+    console.error("Token validation network error:", e);
+    return { valid: false, reason: "Error de red al conectar con GitHub" };
   }
 }
 
@@ -31,14 +39,20 @@ async function handleLogin() {
   
   if(!token) { alert("Introduce el token"); return; }
   
-  const valid = await validateToken(token);
-  if(!valid) { alert("Token inválido."); return; }
+  const result = await validateToken(token);
+  if(!result.valid) { 
+      alert(`Token inválido.\nDetalles: ${result.reason}\n\nNota: Si usas una Organización, asegúrate de haber pulsado "Configure SSO" en tu token.`); 
+      return; 
+  }
   
   // Guardamos configuración
   setToken(token);
   
   document.getElementById("login-screen").classList.add("hidden");
   document.getElementById("app-container").classList.remove("hidden");
+  
+  // Feedback visual
+  console.log(`Logueado como ${result.login}`);
   
   if(window.startApp) window.startApp();
 }
