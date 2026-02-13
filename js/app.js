@@ -1,10 +1,30 @@
 let data; let currentVehicle;
 
+const DEFAULT_CATEGORIES = [
+  "Filtro Aire", "Filtro Aceite", "Aceite Motor", "Líquido de Frenos",
+  "Filtro Habitáculo", "Filtro Combustible", "Correa de Distribución", "ITV",
+  "Líquido de Caja de Cambios", "Líquido de Diferenciales", "Aditivos",
+  "Ruedas Delanteras", "Ruedas Traseras", "Reparación Pinchazo", "Inflado Neumáticos",
+  "Bujías", "Suspensiones Delanteras", "Suspensiones Traseras",
+  "Pastillas Freno Delanteras", "Pastillas Freno Traseras",
+  "Discos Freno Delanteros", "Discos Freno Traseros",
+  "Líquido Anticongelante", "Líquido de Dirección", "Limpiaparabrisas",
+  "Luces", "Motor de arranque", "Inyectores"
+];
+
 async function start() {
   data = await loadData();
   // Validar estructura de data
   if (!data || typeof data !== 'object') data = { vehicles: [] };
   if (!data.vehicles) data.vehicles = [];
+  
+  // Garantizar lista de categorías
+  if (!data.categories) data.categories = [...DEFAULT_CATEGORIES];
+  else {
+      // Merge por si acaso añadimos nuevas por defecto en el futuro que el usuario no tenga
+      // aunque de momento respetamos las suyas.
+      // Opcional: data.categories = [...new Set([...data.categories, ...DEFAULT_CATEGORIES])];
+  }
 
   if (data.vehicles.length === 0){
     // Si no hay vehículos, pedir crear uno, pero esperar a que termine para seguir
@@ -21,11 +41,39 @@ async function start() {
 }
 
 function init(){ 
+  renderCategoriesDatalist();
   renderVehicleSelect(); 
   renderVehicleInfo(); // Nueva función
   renderTimeline(); 
   renderReminders(); 
   renderStats(); 
+}
+
+function renderCategoriesDatalist() {
+    let datalist = document.getElementById("maintenance-categories");
+    if(!datalist) {
+        datalist = document.createElement("datalist");
+        datalist.id = "maintenance-categories";
+        document.body.appendChild(datalist);
+    }
+    datalist.innerHTML = "";
+    data.categories.sort().forEach(cat => {
+        const opt = document.createElement("option");
+        opt.value = cat;
+        datalist.appendChild(opt);
+    });
+}
+
+function checkAndAddCategory(newCat) {
+    if(!newCat) return;
+    const catFormatted = newCat.trim();
+    // Case insensitive check
+    const exists = data.categories.some(c => c.toLowerCase() === catFormatted.toLowerCase());
+    if(!exists) {
+        data.categories.push(catFormatted);
+        renderCategoriesDatalist();
+        // save happen in the caller function
+    }
 }
 
 function renderVehicleSelect() {
@@ -162,6 +210,8 @@ async function addMaintenance() {
       cost: Number(costEl.value)
   };
   
+  checkAndAddCategory(entry.maintType);
+
   currentVehicle.maintenanceEntries.push(entry); 
   checkAndUpdateOdometer(entry.odometer); // Auto-actualizar KMs globales
   
@@ -225,8 +275,83 @@ function renderReminders(){
   const tbody=document.querySelector("#reminderTable tbody"); tbody.innerHTML="";
   if(!currentVehicle) return;
 
+  const currentOdometer = currentVehicle.currentOdometer || calculateMaxOdometer();
+  const today = new Date();
+
   currentVehicle.reminders.forEach((r,index)=>{
-    // Retrocompatibilidad: convertir intervalDays a visualización Meses (aprox) si no tiene unit
+    // Lógica de Estado (Semáforo)
+    let status = 'ok'; 
+    let reasons = [];
+
+    // 1. Buscar último mantenimiento realizado que coincida con el título
+    const matches = currentVehicle.maintenanceEntries.filter(m => 
+        m.maintType && r.title && m.maintType.toLowerCase().trim() === r.title.toLowerCase().trim()
+    );
+
+    let lastKm = 0;
+    let lastDate = null;
+
+    if(matches.length > 0) {
+        // Ordenar por odómetro desc
+        matches.sort((a,b) => b.odometer - a.odometer);
+        lastKm = matches[0].odometer; // El más reciente en KM
+
+        // Ordenar por fecha desc (puede ser distinto si metieron datos desordenados)
+        const timeMatches = [...matches].sort((a,b) => new Date(b.date) - new Date(a.date));
+        lastDate = new Date(timeMatches[0].date);
+    }
+
+    // 2. Calcular Status por KM
+    if(r.intervalKm > 0) {
+        const dueKm = lastKm + r.intervalKm;
+        const remainingKm = dueKm - currentOdometer;
+        
+        if (remainingKm < 0) {
+            status = 'danger';
+            reasons.push(`Pasado por ${Math.abs(remainingKm)} km`);
+        } else if (remainingKm < 1000) {
+            if(status !== 'danger') status = 'warning';
+            reasons.push(`Vence en ${remainingKm} km`);
+        } else {
+            reasons.push(`Quedan ${remainingKm} km`);
+        }
+    }
+
+    // 3. Calcular Status por Tiempo
+    let monthsToAdd = 0;
+    if(r.intervalMonths) monthsToAdd = r.intervalMonths;
+    else if(r.intervalYears) monthsToAdd = r.intervalYears * 12;
+    // Si guardó days (legacy), convertimos
+    else if(r.intervalDays) monthsToAdd = r.intervalDays / 30;
+
+    if(monthsToAdd > 0) {
+        if (!lastDate) {
+            // Nunca hecho y tiene fecha límite -> Danger o Warning?
+            // Si el coche es nuevo no pasa nada, pero asumimos que si configuras recordatorio quieres control.
+            status = 'danger';
+            reasons.push("Nunca realizado (fecha)");
+        } else {
+            const dueDate = new Date(lastDate);
+            dueDate.setMonth(dueDate.getMonth() + monthsToAdd);
+            
+            // Diff en días
+            const diffTime = dueDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+            
+            if(diffDays < 0) {
+                status = 'danger';
+                reasons.push(`Vencido hace ${Math.abs(diffDays)} días`);
+            } else if(diffDays < 30) {
+                if(status !== 'danger') status = 'warning';
+                reasons.push(`Vence en ${diffDays} días`);
+            } else {
+                reasons.push(`Quedan ${diffDays} días`);
+            }
+        }
+    }
+
+    // Preparar UI
+    
     let timeVal = 0;
     let timeUnit = 'months'; // default
     
@@ -237,14 +362,16 @@ function renderReminders(){
        timeVal = r.intervalYears;
        timeUnit = 'years';
     } else if (r.intervalDays) {
-       // Si es legacy data en dias, convertimos visualmente a meses
        timeVal = Math.round(r.intervalDays / 30);
        timeUnit = 'months';
     }
 
     const tr=document.createElement("tr");
+    tr.className = `status-${status}`;
+    tr.title = reasons.join(" • "); // Tooltip nativo
+
     tr.innerHTML=`
-      <td><input type="text" value="${r.title}" onchange="updateReminder(${index},'title',this.value)"></td>
+      <td><input type="text" value="${r.title}" list="maintenance-categories" onchange="updateReminder(${index},'title',this.value)"></td>
       <td><input type="number" value="${r.intervalKm}" onchange="updateReminder(${index},'intervalKm',this.value)" style="width: 80px"> km</td>
       <td style="display:flex; gap:5px;">
         <input type="number" value="${timeVal}" onchange="updateReminderTime(${index}, this.value, document.getElementById('unit_${index}').value)" style="width: 60px">
@@ -293,6 +420,8 @@ function updateReminderTime(index, value, unit) {
 
 function updateReminder(index,field,value){
   if(field==='intervalKm') value=Number(value);
+  if(field==='title') checkAndAddCategory(value);
+  
   currentVehicle.reminders[index][field]=value; saveData(data);
 }
 
