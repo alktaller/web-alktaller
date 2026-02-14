@@ -1021,23 +1021,36 @@ function renderReminders(){
         `;
     }
     
-    // Categories for title
-    const categoriesOptions = data.categories.sort().map(c => `<option value="${escapeAttr(c)}">`).join('');
+    // Categories for title - dropdown
+    // Create a copy to avoid mutating the global category list when adding custom titles
+    const sortedCats = [...data.categories].sort();
+    
+    // Ensure current title is in the list (if not empty) so it doesn't get lost in the UI
+    if (r.title && !sortedCats.includes(r.title)) {
+        sortedCats.push(r.title);
+        sortedCats.sort();
+    }
+
+    const categoriesOptions = sortedCats.map(c => 
+        `<option value="${escapeAttr(c)}" ${r.title === c ? 'selected' : ''}>${escapeAttr(c)}</option>`
+    ).join('');
 
     card.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
              <div style="flex:1; margin-right:10px;">
                  <label style="font-size:0.75rem; color:#64748b; display:block; margin-bottom:2px;">Título (Tipo de mantenimiento)</label>
-                 <input type="text" value="${escapeAttr(r.title)}" list="rem_cat_list_${index}" 
-                        onchange="updateReminder(${index},'title',this.value)" 
+                 <select onchange="updateReminder(${index},'title',this.value)" 
                         style="width:100%; font-weight:bold; border:1px solid #cbd5e1; border-radius:4px; padding:4px;">
-                 <datalist id="rem_cat_list_${index}">${categoriesOptions}</datalist>
+                     <option value="">Seleccionar...</option>
+                     ${categoriesOptions}
+                 </select>
              </div>
              <div>
                  <label style="font-size:0.75rem; color:#64748b; display:block; margin-bottom:2px;">Tipo</label>
                  <select onchange="updateReminder(${index},'type',this.value)" style="padding:4px; border-radius:4px; border:1px solid #cbd5e1;">
                      <option value="km" ${r.type==='km'?'selected':''}>Por Km</option>
                      <option value="date" ${r.type==='date'?'selected':''}>Por Fecha</option>
+
                      <option value="both" ${r.type==='both'?'selected':''}>Ambos</option>
                  </select>
              </div>
