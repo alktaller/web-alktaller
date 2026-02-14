@@ -52,6 +52,13 @@ function init(){
       if(el) el.value = data.settings.ntfyTopic;
   }
   
+  // Set explicit default dates for Actions on init
+  const todayVal = new Date().toISOString().split('T')[0];
+  const fuelDate = document.getElementById("fuelDate");
+  const maintDate = document.getElementById("maintDate");
+  if(fuelDate) fuelDate.value = todayVal; // Force default
+  if(maintDate) maintDate.value = todayVal; // Force default
+
   renderVehicleInfo(); // Nueva función
   renderTimeline(); 
   renderReminders(); 
