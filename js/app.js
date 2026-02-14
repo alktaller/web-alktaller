@@ -1,5 +1,7 @@
 let data; let currentVehicle;
 let editState = null; // { type: 'fuel'|'maintenance', index: number }
+let currentReminderSort = 'urgency'; // 'urgency' | 'alpha' | 'date_asc' | 'date_desc'
+let currentHistorySort = 'date_desc'; // 'date_desc' | 'date_asc' | 'cost_desc' | 'cost_asc'
 
 const DEFAULT_CATEGORIES = [
   "Filtro Aire", "Filtro Aceite", "Aceite Motor", "Líquido de Frenos",
@@ -532,21 +534,41 @@ function escapeAttr(str) {
     return String(str).replace(/"/g, '&quot;');
 }
 
+// Add filter/sort control at the top of history
 function renderTimeline() {
   const list=document.getElementById("timeline"); list.innerHTML="";
   if(!currentVehicle) return;
+
+  // Add Sorting Controls
+  const sortDiv = document.createElement("div");
+  sortDiv.style.cssText = "padding: 0 10px 10px 10px; border-bottom: 1px solid #f1f5f9; display:flex; justify-content:flex-end;";
+  sortDiv.innerHTML = `
+    <select onchange="updateHistorySort(this.value)" style="padding:4px 8px; border-radius:4px; border:1px solid #cbd5e1; font-size:0.85rem; background:white;">
+        <option value="date_desc" ${currentHistorySort==='date_desc'?'selected':''}>Fecha (Reciente)</option>
+        <option value="date_asc" ${currentHistorySort==='date_asc'?'selected':''}>Fecha (Antiguo)</option>
+        <option value="cost_desc" ${currentHistorySort==='cost_desc'?'selected':''}>Coste (Mayor)</option>
+        <option value="cost_asc" ${currentHistorySort==='cost_asc'?'selected':''}>Coste (Menor)</option>
+    </select>
+  `;
+  list.appendChild(sortDiv);
   
   // Combine and sort entries
   const fuels = currentVehicle.fuelEntries.map((e,i) => ({...e, _origIndex: i, _type: 'fuel'}));
   const maints = currentVehicle.maintenanceEntries.map((e,i) => ({...e, _origIndex: i, _type: 'maintenance'}));
 
   const all=[...fuels, ...maints].sort((a,b) => {
-      const da = new Date(a.date);
-      const db = new Date(b.date);
-      // Safe sort handling invalid dates
-      if (isNaN(da)) return 1; 
-      if (isNaN(db)) return -1;
-      return db - da;
+      // Sort logic switch
+      if (currentHistorySort === 'date_desc' || currentHistorySort === 'date_asc') {
+          const da = new Date(a.date);
+          const db = new Date(b.date);
+          if (isNaN(da)) return 1; if (isNaN(db)) return -1;
+          return currentHistorySort === 'date_desc' ? (db - da) : (da - db);
+      } else if (currentHistorySort === 'cost_desc' || currentHistorySort === 'cost_asc') {
+          const ca = Number(a.totalCost || a.cost || 0);
+          const cb = Number(b.totalCost || b.cost || 0);
+          return currentHistorySort === 'cost_desc' ? (cb - ca) : (ca - cb);
+      }
+      return 0;
   });
 
   // Defines SVG Icons
@@ -860,7 +882,20 @@ function renderReminders(){
   const currentOdometer = currentVehicle.currentOdometer || calculateMaxOdometer();
   const today = new Date();
 
-  currentVehicle.reminders.forEach((r,index)=>{
+  // Add Sort Controls
+  const sortDiv = document.createElement("div");
+  sortDiv.style.cssText = "padding: 0 0 10px 0; border-bottom: 1px solid #f1f5f9; display:flex; justify-content:flex-end; margin-bottom:10px;";
+  sortDiv.innerHTML = `
+    <select onchange="updateReminderSort(this.value)" style="padding:4px 8px; border-radius:4px; border:1px solid #cbd5e1; font-size:0.85rem; background:white;">
+        <option value="urgency" ${currentReminderSort==='urgency'?'selected':''}>Urgencia (Semáforo)</option>
+        <option value="alpha" ${currentReminderSort==='alpha'?'selected':''}>Alfabético</option>
+        <option value="created" ${currentReminderSort==='created'?'selected':''}>Creación (Defecto)</option>
+    </select>
+  `;
+  container.appendChild(sortDiv);
+
+  // 1. Pre-calculate logic for all reminders
+  const calculatedItems = currentVehicle.reminders.map((r, index) => {
     // Migration: ensure type exists. Default to 'both' if existing data implies it, else 'km'
     if(!r.type) {
         if(r.intervalKm > 0 && (r.intervalMonths > 0 || r.intervalYears > 0 || r.intervalDays > 0)) r.type = 'both';
@@ -868,10 +903,6 @@ function renderReminders(){
         else r.type = 'km';
     }
 
-    // 1. Logic for Status & Calculation
-    let status = 'ok'; 
-    let reasons = []; // Not used for tooltip anymore, but for card styling maybe?
-    
     // Find last completion
     const matches = currentVehicle.maintenanceEntries.filter(m => 
         m.maintType && r.title && m.maintType.toLowerCase().trim() === r.title.toLowerCase().trim()
@@ -889,9 +920,9 @@ function renderReminders(){
 
     // KM Calculation
     let dueKm = 0;
-    let remainingKm = 0;
+    let remainingKm = Infinity; // Use Infinity for sorting
     let effectiveTargetKm = null;
-    let effectiveTargetDate = null;
+    let kmStatus = 'ok';
 
     if(r.type === 'km' || r.type === 'both') {
        if(r.intervalKm > 0) {
@@ -899,56 +930,96 @@ function renderReminders(){
            effectiveTargetKm = (r.targetKm !== undefined && r.targetKm !== null) ? Number(r.targetKm) : dueKm;
            
            remainingKm = effectiveTargetKm - currentOdometer;
-           if(remainingKm < 0) status = 'danger';
-           else if(remainingKm < 1000 && status !== 'danger') status = 'warning';
+           if(remainingKm < 0) kmStatus = 'danger';
+           else if(remainingKm < 1000) kmStatus = 'warning';
        }
     }
 
     // Date Calculation
-    let dueDate = null;
-    let remainingDays = 0;
+    let remainingDays = Infinity; // Use Infinity for sorting
+    let effectiveTargetDate = null;
+    let dateStatus = 'ok';
     
     let timeVal = 0;
     let timeUnit = 'months';
     if(r.intervalMonths) { timeVal=r.intervalMonths; timeUnit='months'; }
     else if(r.intervalYears) { timeVal=r.intervalYears; timeUnit='years'; }
-    else if(r.intervalDays) { timeVal=Math.round(r.intervalDays/30); timeUnit='months'; } // Legacy
+    else if(r.intervalDays) { timeVal=Math.round(r.intervalDays/30); timeUnit='months'; } 
 
     if(r.type === 'date' || r.type === 'both') {
-        // Use user manual date if exists
         if (r.targetDate) {
             effectiveTargetDate = new Date(r.targetDate);
         }
-
         let monthsToAdd = 0;
         if(timeUnit === 'months') monthsToAdd = Number(timeVal);
         else if(timeUnit === 'years') monthsToAdd = Number(timeVal) * 12;
 
         if(effectiveTargetDate) {
-             // Valid simple logic from manual date
-            const diffTime = effectiveTargetDate - today;
-            remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
-            if(remainingDays < 0) status = 'danger';
-            else if(remainingDays < 30 && status !== 'danger') status = 'warning';
-
+             const diffTime = effectiveTargetDate - today;
+             remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         } else if(monthsToAdd > 0) {
             if(!lastDate) {
-                 status = 'danger'; // Never done
+                 remainingDays = -99999;
             } else {
-                dueDate = new Date(lastDate);
+                let dueDate = new Date(lastDate);
                 dueDate.setMonth(dueDate.getMonth() + monthsToAdd);
-                effectiveTargetDate = dueDate; // Calc default
+                effectiveTargetDate = dueDate; 
 
                 const diffTime = dueDate - today;
                 remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                
-                if(remainingDays < 0) status = 'danger';
-                else if(remainingDays < 30 && status !== 'danger') status = 'warning';
             }
         }
     }
+
+    if(r.type === 'date' || r.type === 'both') {
+        if(remainingDays < 0) dateStatus = 'danger';
+        else if(remainingDays < 30) dateStatus = 'warning';
+    }
+
+    let status = 'ok';
+    if(kmStatus === 'danger' || dateStatus === 'danger') status = 'danger';
+    else if(kmStatus === 'warning' || dateStatus === 'warning') status = 'warning';
+
+    // Calculation for Sorting Score
+    let statusPriority = 2; // Ok
+    if(status === 'danger') statusPriority = 0;
+    else if(status === 'warning') statusPriority = 1;
     
+    const rKm = remainingKm === Infinity ? 999999 : remainingKm;
+    const rDays = remainingDays === Infinity ? 999999 : remainingDays;
+    const limitingFactor = Math.min(rKm, rDays * 50);
+    
+    return {
+        originalIndex: index,
+        r,
+        status,
+        effectiveTargetKm,
+        effectiveTargetDate,
+        remainingKm,
+        remainingDays,
+        timeVal,
+        timeUnit,
+        limitingFactor, 
+        statusPriority
+    };
+  });
+
+  // 2. Sort
+  const sortedItems = calculatedItems.sort((a,b) => {
+      if(currentReminderSort === 'urgency') {
+          if(a.statusPriority !== b.statusPriority) return a.statusPriority - b.statusPriority;
+          return a.limitingFactor - b.limitingFactor;
+      } else if(currentReminderSort === 'alpha') {
+          return (a.r.title || "").localeCompare(b.r.title || "");
+      }
+      return a.originalIndex - b.originalIndex;
+  });
+
+  // 3. Render
+  sortedItems.forEach(item => {
+    const { r, originalIndex, status, remainingKm, remainingDays, effectiveTargetKm, effectiveTargetDate, timeVal, timeUnit } = item;
+    const index = originalIndex; 
+
     // For input rendering
     // Date inputs need YYYY-MM-DD
     const dateInputVal = effectiveTargetDate ? effectiveTargetDate.toISOString().split('T')[0] : '';
@@ -1372,6 +1443,16 @@ async function exportVehiclePDF() {
 }
 
 // Initial check & Boot
+function updateHistorySort(val) {
+    currentHistorySort = val;
+    renderTimeline();
+}
+
+function updateReminderSort(val) {
+    currentReminderSort = val;
+    renderReminders();
+}
+
 async function initApp() {
   try {
       const token = sessionStorage.getItem("githubToken");
