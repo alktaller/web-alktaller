@@ -263,6 +263,13 @@ function renderVehicleInfo() {
       currentVehicle.currentOdometer = calculateMaxOdometer();
   }
   document.getElementById("infoOdo").value = currentVehicle.currentOdometer;
+
+  // Set default dates for new Actions if empty
+  const todayVal = new Date().toISOString().split('T')[0];
+  const fuelDate = document.getElementById("fuelDate");
+  const maintDate = document.getElementById("maintDate");
+  if(fuelDate && !fuelDate.value) fuelDate.value = todayVal;
+  if(maintDate && !maintDate.value) maintDate.value = todayVal;
 }
 
 async function uploadVehiclePolicy(input) {
@@ -382,8 +389,9 @@ async function addFuel() {
 
   checkAndUpdateOdometer(entry.odometer); // Auto-actualizar KMs globales
   
-  // Limpiar formulario
-  dateEl.value = ""; odoEl.value = ""; litersEl.value = ""; costEl.value = "";
+  // Limpiar formulario y poner fecha hoy
+  dateEl.value = new Date().toISOString().split("T")[0];
+  odoEl.value = ""; litersEl.value = ""; costEl.value = "";
   if(isFullEl) isFullEl.checked = true;
   
   renderTimeline(); renderReminders(); renderStats();
@@ -449,8 +457,9 @@ async function addMaintenance() {
 
   checkAndUpdateOdometer(entry.odometer); // Auto-actualizar KMs globales
   
-   // Limpiar formulario
-   dateEl.value = ""; typeEl.value = ""; odoEl.value = ""; costEl.value = "";
+   // Limpiar formulario con fecha hoy
+   dateEl.value = new Date().toISOString().split("T")[0];
+   typeEl.value = ""; odoEl.value = ""; costEl.value = "";
    if(garageEl) garageEl.value = "";
    if(ticketEl) ticketEl.value = "";
 
