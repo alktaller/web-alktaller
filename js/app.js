@@ -993,7 +993,23 @@ function renderReminders(){
 
     let dateSection = '';
     if(r.type === 'date' || r.type === 'both') {
-        const remainingText = effectiveTargetDate ? (remainingDays < 0 ? `Hace ${Math.abs(remainingDays)} días` : `${remainingDays} días`) : '-';
+        let remainingText = '-';
+        if(effectiveTargetDate) {
+            if(remainingDays < 0) {
+                 remainingText = `Hace ${Math.abs(remainingDays)} días`;
+            } else {
+                 if(remainingDays > 30) {
+                     const y = Math.floor(remainingDays / 365);
+                     const m = Math.floor((remainingDays % 365) / 30);
+                     const parts = [];
+                     if(y > 0) parts.push(`${y} año${y>1?'s':''}`);
+                     if(m > 0) parts.push(`${m} mes${m>1?'es':''}`);
+                     remainingText = parts.length > 0 ? parts.join(' y ') : `${remainingDays} días`; // Fallback for exactly 30-ish days if calc results in 0
+                 } else {
+                     remainingText = `${remainingDays} días`;
+                 }
+            }
+        }
 
         dateSection = `
             <div style="margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9;">
