@@ -1246,6 +1246,42 @@ window.openTab = function(tabId) {
 };
 
 // --- EXPORT PDF FEATURE ---
+async function fetchImageAsBase64(url) {
+  if (!url) return null;
+  try {
+      const token = sessionStorage.getItem("githubToken");
+      let fetchUrl = url;
+      const headers = { 'Authorization': `Bearer ${token}` };
+
+      // Heuristic: Convert GitHub Blob URL to API Raw URL if needed for private repos
+      // Blob: https://github.com/user/repo/blob/main/path/img.jpg
+      // API: https://api.github.com/repos/user/repo/contents/path/img.jpg?ref=main
+      if (url.includes('github.com') && url.includes('/blob/')) {
+          const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)\/blob\/([^\/]+)\/(.+)$/);
+          if (match) {
+              const [_, owner, repo, branch, path] = match;
+              fetchUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+              headers['Accept'] = 'application/vnd.github.v3.raw';
+          }
+      } else if (url.includes('api.github.com')) {
+          headers['Accept'] = 'application/vnd.github.v3.raw';
+      }
+
+      const res = await fetch(fetchUrl, { headers });
+      if(!res.ok) throw new Error(`Status ${res.status}`);
+      const blob = await res.blob();
+      
+      return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+      });
+  } catch(e) {
+      console.warn("PDF Attachment fetch failed:", e);
+      return null;
+  }
+}
+
 async function exportVehiclePDF() {
   if(!currentVehicle) return;
   const { jsPDF } = window.jspdf;
@@ -1437,6 +1473,54 @@ async function exportVehiclePDF() {
       styles: { fontSize: 8 },
       headStyles: { fillColor: [52, 73, 94] }
   });
+
+  // --- ATTACHMENTS (Tickets) ---
+  const ticketEntries = (currentVehicle.maintenanceEntries||[]).filter(m => m.ticket);
+  
+  if(ticketEntries.length > 0) {
+      // Process serially to maintain order and pdf structure
+      for(const entry of ticketEntries) {
+          try {
+              const b64 = await fetchImageAsBase64(entry.ticket);
+              if(b64) {
+                  doc.addPage();
+                  
+                  // Header
+                  doc.setFontSize(14);
+                  doc.setTextColor(40);
+                  doc.text("Adjunto: Ticket / Factura", 14, 20);
+                  
+                  // Meta info
+                  doc.setFontSize(10);
+                  doc.setTextColor(100);
+                  doc.text(`Fecha: ${entry.date} | Tipo: ${entry.maintType}`, 14, 28);
+                  doc.text(`Coste: ${entry.cost} € | ${entry.garage || 'Sin taller'}`, 14, 34);
+                  
+                  // Image
+                  const imgProps = doc.getImageProperties(b64);
+                  const pdfW = doc.internal.pageSize.getWidth();
+                  const pdfH = doc.internal.pageSize.getHeight();
+                  const margin = 14;
+                  const maxW = pdfW - (margin*2);
+                  const maxH = pdfH - 50; // top margin
+                  
+                  const ratio = imgProps.height / imgProps.width;
+                  let finalW = maxW;
+                  let finalH = finalW * ratio;
+                  
+                  // Scale if too tall
+                  if(finalH > maxH) {
+                      finalH = maxH;
+                      finalW = finalH / ratio;
+                  }
+                  
+                  doc.addImage(b64, 'JPEG', margin, 40, finalW, finalH);
+              }
+          } catch(err) {
+              console.warn("Could not add attachment for", entry, err);
+          }
+      }
+  }
 
   // Save
   doc.save(`Informe_${currentVehicle.plate || 'Vehiculo'}_${new Date().toISOString().split('T')[0]}.pdf`);
