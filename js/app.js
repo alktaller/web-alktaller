@@ -461,6 +461,7 @@ async function addMaintenance() {
   checkAndAddCategory(entry.maintType);
 
   currentVehicle.maintenanceEntries.push(entry); 
+    syncRemindersAfterMaintenanceChange(entry.maintType);
 
   checkAndUpdateOdometer(entry.odometer); // Auto-actualizar KMs globales
   
@@ -470,7 +471,7 @@ async function addMaintenance() {
    if(garageEl) garageEl.value = "";
    if(ticketEl) ticketEl.value = "";
 
-  renderTimeline(); renderStats();
+    renderTimeline(); renderReminders(); renderStats();
   await saveData(data);
 }
 
@@ -482,11 +483,16 @@ function deleteEntry(typeIndex, typeType) {
     if(typeType === 'fuel') {
         currentVehicle.fuelEntries.splice(typeIndex, 1);
     } else {
+        const deletedMaintenance = currentVehicle.maintenanceEntries[typeIndex];
         currentVehicle.maintenanceEntries.splice(typeIndex, 1);
+        if(deletedMaintenance && deletedMaintenance.maintType) {
+            syncRemindersAfterMaintenanceChange(deletedMaintenance.maintType);
+        }
     }
     
     saveData(data);
     renderTimeline();
+    renderReminders();
     renderStats();
 }
 
@@ -528,10 +534,16 @@ function saveInlineEntry(index, type) {
                 ticket: oldEntry.ticket // Keep existing ticket
             };
             currentVehicle.maintenanceEntries[index] = entry;
+
+            if(oldEntry && oldEntry.maintType) {
+                syncRemindersAfterMaintenanceChange(oldEntry.maintType);
+            }
+            syncRemindersAfterMaintenanceChange(entry.maintType);
         }
 
         checkAndUpdateOdometer(entry.odometer);
         saveData(data);
+        renderReminders();
         exitEditMode();
 
     } catch(e) {
@@ -889,6 +901,21 @@ function renderStats() {
 }
 
 // ---------------- RECORDATORIOS EDITABLES ----------------
+function syncRemindersAfterMaintenanceChange(maintType) {
+    if(!currentVehicle || !maintType) return;
+
+    const normalizedType = String(maintType).toLowerCase().trim();
+    if(!normalizedType) return;
+
+    currentVehicle.reminders.forEach((reminder) => {
+        const reminderTitle = String(reminder.title || '').toLowerCase().trim();
+        if(reminderTitle && reminderTitle === normalizedType) {
+            reminder.targetDate = null;
+            reminder.targetKm = null;
+        }
+    });
+}
+
 function renderReminders(){
   const container = document.getElementById("remindersList"); 
   if(!container) return; // Safety check
