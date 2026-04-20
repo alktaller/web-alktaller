@@ -745,7 +745,10 @@ async function addTax() {
   notesEl.value = "";
   if(ticketEl) ticketEl.value = "";
 
+  syncRemindersAfterMaintenanceChange(typeEl.value);
+
   renderTimeline();
+  renderReminders();
   renderStats();
   await saveData(data);
 }
@@ -771,7 +774,11 @@ function deleteEntry(typeIndex, typeType) {
     if(typeType === 'fuel') {
         currentVehicle.fuelEntries.splice(typeIndex, 1);
     } else if(typeType === 'tax') {
-        currentVehicle.taxEntries.splice(typeIndex, 1);
+        const toDelete = currentVehicle.taxEntries[typeIndex];
+    currentVehicle.taxEntries.splice(typeIndex, 1);
+    if(toDelete && toDelete.taxType) {
+        syncRemindersAfterMaintenanceChange(toDelete.taxType);
+    }
     } else {
         const deletedMaintenance = currentVehicle.maintenanceEntries[typeIndex];
         currentVehicle.maintenanceEntries.splice(typeIndex, 1);
@@ -823,6 +830,11 @@ function saveInlineEntry(index, type) {
                 ticket: oldEntry.ticket
             };
             currentVehicle.taxEntries[index] = entry;
+
+        if (oldEntry && oldEntry.taxType) {
+            syncRemindersAfterMaintenanceChange(oldEntry.taxType);
+        }
+        syncRemindersAfterMaintenanceChange(entry.taxType);
         } else {
             if(!val(`edit_date_${index}`) || !val(`edit_type_${index}`)) throw new Error("Fecha y Tipo requeridos");
             // Preserve ticket if not changed (no upload in inline edit for now, just keep old)
@@ -1398,9 +1410,13 @@ function renderReminders(){
     }
 
     // Find last completion
-    const matches = currentVehicle.maintenanceEntries.filter(m => 
+    const maintMatches = currentVehicle.maintenanceEntries.filter(m => 
         m.maintType && r.title && m.maintType.toLowerCase().trim() === r.title.toLowerCase().trim()
     );
+    const taxMatches = (currentVehicle.taxEntries || []).filter(t => 
+        t.taxType && r.title && t.taxType.toLowerCase().trim() === r.title.toLowerCase().trim()
+    );
+    const matches = [...maintMatches, ...taxMatches];
     let lastKm = 0;
     let lastDate = null;
 
@@ -1604,7 +1620,9 @@ function renderReminders(){
     
     // Categories for title - dropdown
     // Create a copy to avoid mutating the global category list when adding custom titles
-    const sortedCats = [...data.categories].sort();
+    const taxTypes = ["ITV", "Numerito", "Seguro", "Multas", "Otros"];
+    let sortedCats = [...data.categories, ...taxTypes].sort();
+    sortedCats = [...new Set(sortedCats)]; // remove duplicates just in case
     
     // Ensure current title is in the list (if not empty) so it doesn't get lost in the UI
     if (r.title && !sortedCats.includes(r.title)) {
