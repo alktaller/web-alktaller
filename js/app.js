@@ -153,6 +153,19 @@ function renderCategoriesDatalist() {
         other.textContent = "✏️ Otro (Escribir manual)...";
         select.appendChild(other);
     }
+
+    const revCont = document.getElementById("revServicesContainer");
+    if(revCont) {
+        revCont.innerHTML = "";
+        data.categories.sort().forEach((cat, i) => {
+            let div = document.createElement("div");
+            div.style.marginBottom = "5px";
+            // Helper as it was in original index.html or we can simply inline escape
+            const safeCat = cat.replace(/"/g, '&quot;');
+            div.innerHTML = `<input type="checkbox" id="revCheck_${i}" value="${safeCat}"> <label for="revCheck_${i}">${safeCat}</label>`;
+            revCont.appendChild(div);
+        });
+    }
 }
 
 function checkAndAddCategory(newCat) {
@@ -224,6 +237,39 @@ async function loadImageSecurely(url, imgElement) {
     }
 }
 
+window.addDynamicNote = async function() {
+    const el = document.getElementById("newDynamicNote");
+    if(!el.value) return;
+    if(!currentVehicle.dynamicNotes) currentVehicle.dynamicNotes = [];
+    currentVehicle.dynamicNotes.push(el.value);
+    el.value = "";
+    renderDynamicNotes();
+    await saveData(data);
+};
+window.updateDynamicNote = async function(index, value) {
+    currentVehicle.dynamicNotes[index] = value;
+    await saveData(data);
+};
+window.removeDynamicNote = async function(index) {
+    currentVehicle.dynamicNotes.splice(index, 1);
+    renderDynamicNotes();
+    await saveData(data);
+};
+
+function renderDynamicNotes() {
+    const container = document.getElementById("dynamicNotesContainer");
+    if (!container) return;
+    container.innerHTML = "";
+    if(!currentVehicle.dynamicNotes) currentVehicle.dynamicNotes = [];
+    currentVehicle.dynamicNotes.forEach((note, index) => {
+        const div = document.createElement("div");
+        div.style = "display:flex; gap:5px;";
+        div.innerHTML = `<input type="text" value="${escapeAttr(note)}" onchange="updateDynamicNote(${index}, this.value)" style="flex:1; border:1px solid #e2e8f0; padding:4px; border-radius:4px;">
+            <button onclick="removeDynamicNote(${index})" style="background:#ef4444; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;" class="btn-error">X</button>`;
+        container.appendChild(div);
+    });
+}
+
 function renderVehicleInfo() {
   if(!currentVehicle) return;
   
@@ -232,7 +278,20 @@ function renderVehicleInfo() {
   document.getElementById("infoVin").value = currentVehicle.vin || "";
   document.getElementById("infoRegDate").value = currentVehicle.regDate || "";
   document.getElementById("infoPurchaseDate").value = currentVehicle.purchaseDate || "";
-  document.getElementById("infoNotes").value = currentVehicle.notes || "";
+  
+  const initialOdoEl = document.getElementById("infoOdoInitial");
+  if(initialOdoEl) initialOdoEl.value = currentVehicle.initialOdometer || "";
+
+  // Migrar y renderizar notas dinámicas
+  if (typeof currentVehicle.notes === 'string' && currentVehicle.notes.trim() !== '') {
+      const splitNotes = currentVehicle.notes.split('\n').map(n => n.trim()).filter(n => n !== '');
+      if(!currentVehicle.dynamicNotes) currentVehicle.dynamicNotes = [];
+      currentVehicle.dynamicNotes = [...currentVehicle.dynamicNotes, ...splitNotes];
+      delete currentVehicle.notes;
+  } else if (typeof currentVehicle.notes === 'string') {
+      delete currentVehicle.notes;
+  }
+  renderDynamicNotes();
   
   // Seguros
   document.getElementById("infoInsuranceCompany").value = currentVehicle.insuranceCompany || "";
@@ -314,9 +373,68 @@ async function uploadVehiclePhoto(input) {
     }
 }
 
+window.renderDynamicNotes = function() {
+    const container = document.getElementById("dynamicNotesContainer");
+    if(!container) return;
+    container.innerHTML = "";
+    if(!currentVehicle || !currentVehicle.dynamicNotes) return;
+    
+    currentVehicle.dynamicNotes.forEach((note, idx) => {
+        const div = document.createElement("div");
+        div.style.display = "flex";
+        div.style.gap = "5px";
+        
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = note;
+        input.style.flex = "1";
+        input.onchange = (e) => window.updateDynamicNote(idx, e.target.value);
+        
+        const btnDelete = document.createElement("button");
+        btnDelete.className = "btn-danger";
+        btnDelete.innerHTML = "X";
+        btnDelete.style.padding = "0 10px";
+        btnDelete.onclick = () => window.removeDynamicNote(idx);
+        
+        div.appendChild(input);
+        div.appendChild(btnDelete);
+        container.appendChild(div);
+    });
+};
+
+window.addDynamicNote = async function() {
+    const input = document.getElementById("newDynamicNote");
+    if(!input || !input.value.trim()) return;
+    if(!currentVehicle.dynamicNotes) currentVehicle.dynamicNotes = [];
+    currentVehicle.dynamicNotes.push(input.value.trim());
+    input.value = "";
+    renderDynamicNotes();
+    await saveData(data);
+};
+
+window.updateDynamicNote = async function(idx, val) {
+    if(currentVehicle.dynamicNotes && currentVehicle.dynamicNotes[idx] !== undefined) {
+        currentVehicle.dynamicNotes[idx] = val;
+        await saveData(data);
+    }
+};
+
+window.removeDynamicNote = async function(idx) {
+    if(!confirm("¿Eliminar línea de información?")) return;
+    if(currentVehicle.dynamicNotes) {
+        currentVehicle.dynamicNotes.splice(idx, 1);
+        renderDynamicNotes();
+        await saveData(data);
+    }
+};
+
 async function updateVehicleInfo(field, value) {
   if(!currentVehicle) return;
-  currentVehicle[field] = value;
+  if(field === 'initialOdometer') {
+      currentVehicle[field] = Number(value) || 0;
+  } else {
+      currentVehicle[field] = value;
+  }
   await saveData(data);
 }
 
@@ -358,7 +476,7 @@ async function addVehicle(isFirst = false) {
       return;
   }
   
-  const v={ id:"car_"+Date.now(), name, fuelEntries:[], maintenanceEntries:[], reminders:[] };
+  const v={ id:"car_"+Date.now(), name, fuelEntries:[], maintenanceEntries:[], taxEntries:[], reminders:[] };
   data.vehicles.push(v); 
   currentVehicle=v;
   
@@ -413,6 +531,7 @@ async function addMaintenance() {
   const odoEl = document.getElementById('maintOdo');
   const costEl = document.getElementById('maintCost');
   const garageEl = document.getElementById('maintGarage');
+  const notesEl = document.getElementById('maintNotes');
   const ticketEl = document.getElementById('maintTicket');
 
   if(!dateEl.value || !typeEl.value) { alert("Fecha y Tipo son obligatorios"); return; }
@@ -454,9 +573,18 @@ async function addMaintenance() {
       maintType: typeEl.value, 
       odometer: Number(odoEl.value), 
       cost: Number(costEl.value),
-      notes: garageEl ? garageEl.value : "", // Save to notes for compatibility
+      garage: garageEl ? garageEl.value : "",
+      notes: notesEl ? notesEl.value : "",
       ticket: ticketUrl // New URL or old URL
   };
+  
+  if(editState && editState.type === 'maintenance') {
+      const oldEntry = currentVehicle.maintenanceEntries[editState.index];
+      if(oldEntry) {
+          entry.notes = oldEntry.notes || ""; // Maintain any preexisting notes
+          if (!entry.garage) entry.garage = oldEntry.garage || oldEntry.notes || "";
+      }
+  }
   
   checkAndAddCategory(entry.maintType);
 
@@ -469,19 +597,181 @@ async function addMaintenance() {
    dateEl.value = new Date().toISOString().split("T")[0];
    typeEl.value = ""; odoEl.value = ""; costEl.value = "";
    if(garageEl) garageEl.value = "";
+   if(notesEl) notesEl.value = "";
    if(ticketEl) ticketEl.value = "";
 
     renderTimeline(); renderReminders(); renderStats();
   await saveData(data);
 }
 
+async function addRevision() {
+  if(!currentVehicle) { alert("Primero selecciona o crea un vehículo."); return; }
+
+  const dateEl = document.getElementById('revDate');
+  const odoEl = document.getElementById('revOdo');
+  const costEl = document.getElementById('revCost');
+  const garageEl = document.getElementById('revGarage');
+  const notesEl = document.getElementById('revNotes');
+  const ticketEl = document.getElementById('revTicket');
+  const servicesCont = document.getElementById('revServicesContainer');
+
+  if(!dateEl || !dateEl.value) { alert("La fecha es obligatoria"); return; }
+
+  // Recopilar servicios seleccionados
+  const selectedTypes = [];
+  if(servicesCont) {
+      const checks = servicesCont.querySelectorAll('input[type="checkbox"]:checked');
+      checks.forEach(chk => {
+          selectedTypes.push(chk.value);
+      });
+  }
+
+  if(selectedTypes.length === 0) {
+      alert("Debes seleccionar al menos un servicio/categoría para la revisión.");
+      return;
+  }
+
+  // Upload Logic si hay ticket (solo lo subimos una vez y lo compartimos)
+  let ticketUrl = null;
+  if(ticketEl && ticketEl.files && ticketEl.files[0]) {
+      try {
+          const btn = document.querySelector('button[onclick="addRevision()"]');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = "Subiendo ticket... ⏳";
+          btn.disabled = true;
+
+          const result = await uploadImage(ticketEl.files[0]);
+          ticketUrl = result.url;
+          
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+      } catch(e) {
+          alert("Error al subir la imagen: " + e.message);
+          return; 
+      }
+  }
+
+  const groupId = "rev_" + Date.now();
+  const baseCost = Number(costEl.value) || 0;
+  const sharedCost = baseCost / selectedTypes.length; // Repartir coste entre los items
+
+  selectedTypes.forEach(type => {
+      const entry = {
+          type: "maintenance",
+          groupId: groupId,
+          date: dateEl.value,
+          maintType: type,
+          odometer: Number(odoEl.value) || 0,
+          cost: sharedCost,
+          garage: garageEl ? garageEl.value : "",
+          notes: notesEl ? notesEl.value : "",
+          ticket: ticketUrl
+      };
+      
+      checkAndAddCategory(type);
+      currentVehicle.maintenanceEntries.push(entry);
+      syncRemindersAfterMaintenanceChange(type);
+      checkAndUpdateOdometer(entry.odometer);
+  });
+
+  // Limpiar formulario con fecha hoy
+  dateEl.value = new Date().toISOString().split("T")[0];
+  if(odoEl) odoEl.value = "";
+  if(costEl) costEl.value = "";
+  if(garageEl) garageEl.value = "";
+  if(notesEl) notesEl.value = "";
+  if(ticketEl) ticketEl.value = "";
+  if(servicesCont) {
+      const checks = servicesCont.querySelectorAll('input[type="checkbox"]');
+      checks.forEach(c => c.checked = false);
+  }
+
+  renderTimeline(); 
+  renderReminders(); 
+  renderStats();
+  await saveData(data);
+}
+
+async function addTax() {
+  if(!currentVehicle) { alert("Selecciona o crea un vehículo primero"); return; }
+  
+  const dateEl = document.getElementById("taxDate");
+  const typeEl = document.getElementById("taxType");
+  const odoEl = document.getElementById("taxOdo");
+  const costEl = document.getElementById("taxCost");
+  const notesEl = document.getElementById("taxNotes");
+  const ticketEl = document.getElementById("taxTicket");
+
+  if(!dateEl || !dateEl.value || !typeEl || !typeEl.value || !costEl || costEl.value === "") { 
+      alert("Fecha, Trámite y Coste son obligatorios."); 
+      return; 
+  }
+
+  let ticketUrl = null;
+  if(ticketEl && ticketEl.files && ticketEl.files[0]) {
+      try {
+          const btn = document.querySelector('button[onclick="addTax()"]');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = "Subiendo documento... ⏳";
+          btn.disabled = true;
+
+          const result = await uploadImage(ticketEl.files[0]);
+          ticketUrl = result.url;
+          
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+      } catch(e) {
+          alert("Error al subir el documento: " + e.message);
+          return; 
+      }
+  }
+
+  if(!currentVehicle.taxEntries) currentVehicle.taxEntries = [];
+  
+  currentVehicle.taxEntries.push({
+    date: document.getElementById('taxDate').valueAsNumber,
+    type: "tax",
+    taxType: typeEl.value,
+    odometer: Number(odoEl.value) || 0,
+    cost: Number(costEl.value) || 0,
+    notes: notesEl.value || "",
+    ticket: ticketUrl
+  });
+
+  dateEl.value = "";
+  typeEl.value = "";
+  odoEl.value = "";
+  costEl.value = "";
+  notesEl.value = "";
+  if(ticketEl) ticketEl.value = "";
+
+  renderTimeline();
+  renderStats();
+  await saveData(data);
+}
+
 // --- EDIT / DELETE HELPERS ---
+function deleteGroup(groupId) {
+    if(!confirm("¿Estás seguro de eliminar TODOS los registros de esta revisión?")) return;
+    const toDelete = currentVehicle.maintenanceEntries.filter(m => m.groupId === groupId);
+    toDelete.forEach(d => {
+        syncRemindersAfterMaintenanceChange(d.maintType);
+    });
+    currentVehicle.maintenanceEntries = currentVehicle.maintenanceEntries.filter(m => m.groupId !== groupId);
+    saveData(data);
+    renderTimeline();
+    renderReminders();
+    renderStats();
+}
+
 function deleteEntry(typeIndex, typeType) {
     if(!confirm("¿Estás seguro de eliminar este registro?")) return;
     
     // typeIndex comes from _origIndex
     if(typeType === 'fuel') {
         currentVehicle.fuelEntries.splice(typeIndex, 1);
+    } else if(typeType === 'tax') {
+        currentVehicle.taxEntries.splice(typeIndex, 1);
     } else {
         const deletedMaintenance = currentVehicle.maintenanceEntries[typeIndex];
         currentVehicle.maintenanceEntries.splice(typeIndex, 1);
@@ -520,6 +810,19 @@ function saveInlineEntry(index, type) {
             };
             currentVehicle.fuelEntries[index] = entry;
 
+        } else if(type === 'tax') {
+            if(!val(`edit_date_${index}`) || !val(`edit_type_${index}`)) throw new Error("Fecha y Tipo requeridos");
+            const oldEntry = currentVehicle.taxEntries[index];
+            entry = {
+                type: 'tax',
+                date: document.getElementById(`edit_date_${index}`).valueAsNumber,
+                taxType: val(`edit_type_${index}`),
+                odometer: num(`edit_odo_${index}`),
+                cost: num(`edit_cost_${index}`),
+                notes: val(`edit_notes_${index}`),
+                ticket: oldEntry.ticket
+            };
+            currentVehicle.taxEntries[index] = entry;
         } else {
             if(!val(`edit_date_${index}`) || !val(`edit_type_${index}`)) throw new Error("Fecha y Tipo requeridos");
             // Preserve ticket if not changed (no upload in inline edit for now, just keep old)
@@ -530,8 +833,10 @@ function saveInlineEntry(index, type) {
                 maintType: val(`edit_type_${index}`),
                 odometer: num(`edit_odo_${index}`),
                 cost: num(`edit_cost_${index}`),
+                garage: val(`edit_garage_${index}`),
                 notes: val(`edit_notes_${index}`),
-                ticket: oldEntry.ticket // Keep existing ticket
+                ticket: oldEntry.ticket, // Keep existing ticket
+                groupId: oldEntry.groupId
             };
             currentVehicle.maintenanceEntries[index] = entry;
 
@@ -581,10 +886,40 @@ function renderTimeline() {
   list.appendChild(sortDiv);
   
   // Combine and sort entries
-  const fuels = currentVehicle.fuelEntries.map((e,i) => ({...e, _origIndex: i, _type: 'fuel'}));
-  const maints = currentVehicle.maintenanceEntries.map((e,i) => ({...e, _origIndex: i, _type: 'maintenance'}));
+  const fuels = currentVehicle.fuelEntries ? currentVehicle.fuelEntries.map((e,i) => ({...e, _origIndex: i, _type: 'fuel'})) : [];
+  const maints = currentVehicle.maintenanceEntries ? currentVehicle.maintenanceEntries.map((e,i) => ({...e, _origIndex: i, _type: 'maintenance'})) : [];
+  const taxes = currentVehicle.taxEntries ? currentVehicle.taxEntries.map((e,i) => ({...e, _origIndex: i, _type: 'tax'})) : [];
+  
+  const allRaw=[...fuels, ...maints, ...taxes];
+  
+  // Grouping logic before sort
+  const groupMap = {};
+  const allMerged = [];
+  allRaw.forEach(e => {
+      // Check if this specific item is being edited
+      const isEditingThis = editState && editState.index === e._origIndex && editState.type === e._type;
+      
+      if(e.groupId && !isEditingThis) {
+          // Check if ANY item in this group is being edited. If so, DO NOT group them!
+          const groupEditing = allRaw.some(x => x.groupId === e.groupId && editState && editState.index === x._origIndex && editState.type === x._type);
+          
+          if(groupEditing) {
+              allMerged.push(e); // Don't group, push individually so it can be edited
+          } else {
+              if(!groupMap[e.groupId]) {
+                  groupMap[e.groupId] = { ...e, _isGroup: true, _groupItems: [] };
+                  groupMap[e.groupId].cost = 0; 
+                  allMerged.push(groupMap[e.groupId]);
+              }
+              groupMap[e.groupId]._groupItems.push(e);
+              groupMap[e.groupId].cost += (e.cost || 0);
+          }
+      } else {
+          allMerged.push(e);
+      }
+  });
 
-  const all=[...fuels, ...maints].sort((a,b) => {
+  const all = allMerged.sort((a,b) => {
       // Sort logic switch
       if (currentHistorySort === 'date_desc' || currentHistorySort === 'date_asc') {
           const da = new Date(a.date);
@@ -601,8 +936,10 @@ function renderTimeline() {
 
   // Defines SVG Icons
   const icons = {
-      fuel: `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#3B82F6"><path d="M3 21.01h.01"></path><path d="M9 21.01h.01"></path><path d="M15 21.01h.01"></path><path d="M21 21.01h.01"></path><path d="M4 21a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2"></path><path d="M3 11h18"></path><path d="M15 11v10"></path></svg>`,
+      tax: `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#10B981"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><path d="M12 18V6"></path></svg>`,
+      fuel: `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#3B82F6"><line x1="3" x2="15" y1="22" y2="22"></line><line x1="4" x2="14" y1="9" y2="9"></line><rect width="12" height="20" x="3" y="2" rx="2" ry="2"></rect><path d="M15 6h4a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-4"></path><line x1="14" x2="14" y1="13" y2="13"></line></svg>`,
       maint: `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#F97316"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`,
+      maintGroup: `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#F97316"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>`,
       pin: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:text-bottom"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`,
       ticket: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:text-bottom"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`,
       camera: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:text-bottom"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`,
@@ -642,6 +979,27 @@ function renderTimeline() {
                     <button onclick="exitEditMode()" style="padding:5px 10px; background:#e2e8f0; color:#475569; border:none; border-radius:4px; cursor:pointer">${icons.cancel} Cancelar</button>
                 </div>
              `;
+         } else if (e._type === 'tax') {
+             li.innerHTML = `
+                <div style="font-weight:bold; color:#10B981; margin-bottom:5px;">Editando Trámite/Impuesto</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; width:100%">
+                    <input type="date" id="edit_date_${e._origIndex}" value="${new Date(e.date).toISOString().split('T')[0]}" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <select id="edit_type_${e._origIndex}" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                        <option value="ITV" ${e.taxType==='ITV'?'selected':''}>ITV</option>
+                        <option value="Numerito" ${e.taxType==='Numerito'?'selected':''}>Numerito (Impuesto Circulación)</option>
+                        <option value="Seguro" ${e.taxType==='Seguro'?'selected':''}>Seguro</option>
+                        <option value="Multas" ${e.taxType==='Multas'?'selected':''}>Multas</option>
+                        <option value="Otros" ${e.taxType==='Otros'?'selected':''}>Otros</option>
+                    </select>
+                    <input type="number" id="edit_odo_${e._origIndex}" value="${escapeAttr(e.odometer)}" placeholder="km" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="number" id="edit_cost_${e._origIndex}" value="${escapeAttr(e.cost)}" placeholder="€" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
+                </div>
+                <input type="text" id="edit_notes_${e._origIndex}" value="${escapeAttr(e.notes)}" placeholder="Notas" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; margin-top:8px;">
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button onclick="saveInlineEntry(${e._origIndex}, 'tax')" style="padding:5px 10px; background:#10B981; color:white; border:none; border-radius:4px; cursor:pointer">${icons.save} Guardar</button>
+                    <button onclick="exitEditMode()" style="padding:5px 10px; background:#e2e8f0; color:#475569; border:none; border-radius:4px; cursor:pointer">${icons.cancel} Cancelar</button>
+                </div>
+             `;
          } else {
              const categoriesOptions = data.categories.sort().map(c => `<option value="${escapeAttr(c)}">${escapeAttr(c)}</option>`).join('');
              const notesTxt = e.notes || e.garage || "";
@@ -663,7 +1021,8 @@ function renderTimeline() {
                     <input type="number" id="edit_odo_${e._origIndex}" value="${escapeAttr(e.odometer)}" placeholder="km" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
                     <input type="number" id="edit_cost_${e._origIndex}" value="${escapeAttr(e.cost)}" placeholder="€" style="padding:5px; border:1px solid #ddd; border-radius:4px;">
                 </div>
-                <input type="text" id="edit_notes_${e._origIndex}" value="${escapeAttr(notesTxt)}" placeholder="Notas / Taller" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; margin-top:8px;">
+                <input type="text" id="edit_garage_${e._origIndex}" value="${escapeAttr(e.garage||'')}" placeholder="Taller" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; margin-top:8px;">
+                <input type="text" id="edit_notes_${e._origIndex}" value="${escapeAttr(e.notes||'')}" placeholder="Notas adicionales" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; margin-top:8px;">
                 <div style="display:flex; gap:10px; margin-top:10px;">
                     <button onclick="saveInlineEntry(${e._origIndex}, 'maintenance')" style="padding:5px 10px; background:#10B981; color:white; border:none; border-radius:4px; cursor:pointer">${icons.save} Guardar</button>
                     <button onclick="exitEditMode()" style="padding:5px 10px; background:#e2e8f0; color:#475569; border:none; border-radius:4px; cursor:pointer">${icons.cancel} Cancelar</button>
@@ -680,15 +1039,19 @@ function renderTimeline() {
       iconDiv.style.cssText = `
         min-width: 40px; height: 40px; 
         border-radius: 50%; 
-        background: ${e.type === "fuel" ? "#EFF6FF" : "#FFF7ED"}; 
+        background: ${e.type === "fuel" ? "#EFF6FF" : (e.type === "tax" ? "#D1FAE5" : "#FFF7ED")}; 
         display: flex; align-items: center; justify-content: center;
       `;
-      iconDiv.innerHTML = e.type === "fuel" ? icons.fuel : icons.maint;
+      iconDiv.innerHTML = e.type === "fuel" ? icons.fuel : (e.type === "tax" ? icons.tax : (e._isGroup ? icons.maintGroup : icons.maint));
 
       const detailsDiv = document.createElement("div");
       detailsDiv.style.flex = "1";
       // Ensure padding right to avoid overlap with actions
       detailsDiv.style.paddingRight = "60px";
+
+      // Actions Div (Absolute top right)
+      const actionsDiv = document.createElement("div");
+      actionsDiv.style.cssText = "position:absolute; top:12px; right:10px; display:flex; gap:8px;";
 
       if(e.type === "fuel") {
           const statusIcon = e.isFull ? icons.check : icons.alert;
@@ -702,13 +1065,98 @@ function renderTimeline() {
                 <span title="${e.isFull?'Lleno':'Parcial'}" style="margin-left:5px;">${statusIcon}</span>
             </div>
           `;
-      } else {
-          const notesText = e.notes || e.garage || "";
+          actionsDiv.innerHTML = `
+            <button onclick="editEntry(${e._origIndex}, '${e._type}')" title="Editar" style="background:none; border:none; cursor:pointer; padding:2px;">${icons.edit}</button>
+            <button onclick="deleteEntry(${e._origIndex}, '${e._type}')" title="Borrar" style="background:none; border:none; cursor:pointer; padding:2px;">${icons.trash}</button>
+          `;
+      } else if(e.type === "tax") {
+          let ticketLink = e.ticket ? `<a href="${e.ticket}" target="_blank" title="Ver Documento" style="color:#10B981; margin-left:8px;">${icons.ticket}</a>` : "";
+          let notesStr = e.notes ? `<div style="margin-top:6px; font-size:0.9rem; color:#64748b;">${icons.pin} Notas: ${e.notes}</div>` : "";
           
-          let garageHtml = notesText ? `
-            <div style="margin-top:6px; font-size:0.9rem; color:#64748b; display:flex; align-items:center; gap:4px;">
-                ${icons.pin} ${notesText}
-            </div>` : "";
+          detailsDiv.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="color:#059669">${e.taxType} (Impuesto/Trámite)</strong>
+                <span style="font-size:0.85rem; color:#94a3b8">${e.date}</span>
+            </div>
+            <div style="color:#475569; margin-top:4px;">
+                Coste: ${e.cost}€ <span style="color:#cbd5e1">|</span> ${e.odometer} km
+                ${ticketLink}
+            </div>
+            ${notesStr}
+          `;
+          actionsDiv.innerHTML = `
+            <button onclick="editEntry(${e._origIndex}, '${e._type}')" title="Editar" style="background:none; border:none; cursor:pointer; padding:2px;">${icons.edit}</button>
+            <button onclick="deleteEntry(${e._origIndex}, '${e._type}')" title="Borrar" style="background:none; border:none; cursor:pointer; padding:2px;">${icons.trash}</button>
+          `;
+      } else if(e._isGroup) {
+          let garageHtml = "";
+          if (e._groupItems[0].garage || e._groupItems[0].notes) {
+              const gt = e._groupItems[0].garage ? `Taller: ${e._groupItems[0].garage}` : "";
+              const nt = e._groupItems[0].notes ? `Notas: ${e._groupItems[0].notes}` : "";
+              const comb = [gt, nt].filter(x=>x).join(" | ");
+              garageHtml = `
+              <div style="margin-top:6px; font-size:0.9rem; color:#64748b; display:flex; align-items:center; gap:4px;">
+                  ${icons.pin} ${comb}
+              </div>`;
+          }
+          
+          let ticketHtml = "";
+          const firstTicketItem = e._groupItems.find(x => x.ticket);
+          if(firstTicketItem) {
+              ticketHtml = `
+              <div style="margin-top:6px;">
+                <a href="${firstTicketItem.ticket}" target="_blank" style="text-decoration:none; color: #E91E63; font-weight:600; font-size:0.85rem; display:flex; align-items:center; gap:4px;">
+                    ${icons.ticket} Ver Ticket
+                </a>
+              </div>`;
+          } else {
+              ticketHtml = `
+              <div style="margin-top:6px;">
+                <button onclick="uploadTicketForEntry(${e._groupItems[0]._origIndex})" style="background:none; border:1px dashed #cbd5e1; border-radius:4px; padding:2px 8px; color:#64748b; font-size:0.8rem; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                    ${icons.camera} Subir Ticket
+                </button>
+              </div>`;
+          }
+          
+          let itemsHtml = e._groupItems.map(item => {
+              return `<div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#475569; padding-left:10px; border-left:2px solid #cbd5e1; margin-top:4px;">
+                <span>${item.maintType} <small>(${Number(item.cost).toFixed(2)}€)</small></span>
+                <div>
+                    <button onclick="editEntry(${item._origIndex}, 'maintenance')" title="Editar Servicio" style="background:none; border:none; cursor:pointer; padding:0 5px; color:#10B981;">✎</button>
+                    <button onclick="deleteEntry(${item._origIndex}, 'maintenance')" title="Borrar Servicio" style="background:none; border:none; cursor:pointer; padding:0 5px; color:#E11D48;">x</button>
+                </div>
+              </div>`;
+          }).join("");
+
+          detailsDiv.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+                <strong style="color:#334155">Revisión Múltiple</strong>
+                <span style="font-size:0.85rem; color:#94a3b8; white-space:nowrap; margin-left:10px;">${e.date}</span>
+            </div>
+            <div style="color:#475569; margin-top:2px;">
+                Total: ${Number(e.cost).toFixed(2)}€ <span style="color:#cbd5e1">|</span> ${e.odometer} km
+            </div>
+            ${garageHtml}
+            <div style="margin-top:8px;">
+                ${itemsHtml}
+            </div>
+            ${ticketHtml}
+          `;
+          // Actions for group
+          actionsDiv.innerHTML = `
+            <button onclick="deleteGroup('${e.groupId}')" title="Borrar Todo" style="background:none; border:none; cursor:pointer; padding:2px;">${icons.trash}</button>
+          `;
+      } else {
+          let garageHtml = "";
+          if (e.garage || e.notes) {
+              const gt = e.garage ? `Taller: ${e.garage}` : "";
+              const nt = e.notes ? `Notas: ${e.notes}` : "";
+              const comb = [gt, nt].filter(x=>x).join(" | ");
+              garageHtml = `
+              <div style="margin-top:6px; font-size:0.9rem; color:#64748b; display:flex; align-items:center; gap:4px;">
+                  ${icons.pin} ${comb}
+              </div>`;
+          }
           
           let ticketHtml = "";
           if(e.ticket) {
@@ -738,16 +1186,11 @@ function renderTimeline() {
             ${garageHtml}
             ${ticketHtml}
           `;
+          actionsDiv.innerHTML = `
+            <button onclick="editEntry(${e._origIndex}, '${e._type}')" title="Editar" style="background:none; border:none; cursor:pointer; padding:2px;">${icons.edit}</button>
+            <button onclick="deleteEntry(${e._origIndex}, '${e._type}')" title="Borrar" style="background:none; border:none; cursor:pointer; padding:2px;">${icons.trash}</button>
+          `;
       }
-
-      // Actions Div (Absolute top right)
-      const actionsDiv = document.createElement("div");
-      actionsDiv.style.cssText = "position:absolute; top:12px; right:10px; display:flex; gap:8px;";
-      
-      actionsDiv.innerHTML = `
-        <button onclick="editEntry(${e._origIndex}, '${e._type}')" title="Editar" style="background:none; border:none; cursor:pointer; padding:2px;">${icons.edit}</button>
-        <button onclick="deleteEntry(${e._origIndex}, '${e._type}')" title="Borrar" style="background:none; border:none; cursor:pointer; padding:2px;">${icons.trash}</button>
-      `;
 
       li.appendChild(iconDiv);
       li.appendChild(detailsDiv);
@@ -803,6 +1246,7 @@ function renderStats() {
   // Calcular Costes Totales
   let totalFuelCost = 0;
   let totalMaintCost = 0;
+  let totalTaxCost = 0;
   let currentYearMaintCost = 0;
 
   (currentVehicle.fuelEntries || []).forEach(f => totalFuelCost += (f.totalCost || 0));
@@ -813,14 +1257,21 @@ function renderStats() {
           currentYearMaintCost += c;
       }
   });
+  (currentVehicle.taxEntries || []).forEach(t => {
+      totalTaxCost += (t.cost || 0);
+  });
 
-  const grandTotal = totalFuelCost + totalMaintCost;
+  const grandTotal = totalFuelCost + totalMaintCost + totalTaxCost;
+
+  const initialKm = Number(currentVehicle.initialOdometer) || 0;
+  const drivenKm = currentTotalKm - initialKm;
 
   // HTML Base
   let html = `<div class="stats-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:1rem; text-align:center;">
     <div style="background:#f1f5f9; padding:10px; border-radius:8px;">
-        <div style="font-size:0.8rem; color:#64748b;">Kilometraje</div>
+        <div style="font-size:0.8rem; color:#64748b;">Kilometraje Actual</div>
         <div style="font-size:1.2rem; font-weight:bold; color:#0f172a;">${currentTotalKm.toLocaleString()} km</div>
+        <div style="font-size:0.75rem; color:#64748b; margin-top:3px;">Hechos: <span style="font-weight:600;">${Math.max(0, drivenKm).toLocaleString()} km</span></div>
     </div>
     <div style="background:#f1f5f9; padding:10px; border-radius:8px;">
         <div style="font-size:0.8rem; color:#64748b;">Gasto Total (Histórico)</div>
@@ -1396,15 +1847,32 @@ async function exportVehiclePDF() {
   doc.text(`Fecha Matriculación: ${currentVehicle.regDate || '-'}`, rightX, yPos);
   yPos += 7;
   
+  // Custom Dynamic Notes
+  if (currentVehicle.dynamicNotes && currentVehicle.dynamicNotes.length > 0) {
+      doc.text("Info Extra:", leftX, yPos);
+      yPos += 5;
+      currentVehicle.dynamicNotes.forEach(note => {
+          doc.text(`- ${note}`, leftX + 5, yPos);
+          yPos += 5;
+      });
+      yPos += 2;
+  }
+  
   // Calculate Stats again for PDF
   const currentTotalKm = currentVehicle.currentOdometer || calculateMaxOdometer();
+  const initialKm = currentVehicle.initialOdometer || 0;
+  const totalDriven = currentTotalKm - initialKm;
   let totalFuelCost = 0;
   let totalMaintCost = 0;
+  let totalTaxCost = 0;
   (currentVehicle.fuelEntries || []).forEach(f => totalFuelCost += (f.totalCost || 0));
   (currentVehicle.maintenanceEntries || []).forEach(m => totalMaintCost += (m.cost || 0));
+  (currentVehicle.taxEntries || []).forEach(t => totalTaxCost += (t.cost || 0));
   
   doc.text(`Kilometraje Actual: ${currentTotalKm.toLocaleString()} km`, leftX, yPos);
-  doc.text(`Gasto Total: ${(totalFuelCost + totalMaintCost).toFixed(2)} €`, rightX, yPos);
+  doc.text(`Distancia Total: ${totalDriven.toLocaleString()} km`, rightX, yPos);
+  yPos += 7;
+  doc.text(`Gasto Total: ${(totalFuelCost + totalMaintCost + totalTaxCost).toFixed(2)} €`, leftX, yPos);
   yPos += 15;
 
   // --- STATS SUMMARY ---
@@ -1460,6 +1928,7 @@ async function exportVehiclePDF() {
       ["Kilómetros Totales", `${currentTotalKm} km`],
       ["Gasto Combustible", `${totalFuelCost.toFixed(2)} €`],
       ["Gasto Mantenimiento", `${totalMaintCost.toFixed(2)} €`],
+      ["Gasto Impuestos", `${totalTaxCost.toFixed(2)} €`],
       ["Consumo Medio", consumptionText],
       ["Coste por Km", costKmText]
   ];
@@ -1490,15 +1959,34 @@ async function exportVehiclePDF() {
       odo: e.odometer, 
       cost: e.totalCost
   }));
-  const mEntries = currentVehicle.maintenanceEntries.map(e => ({
-      date: e.date,
-      type: 'Mantenimiento', 
-      desc: `${e.maintType} - ${e.notes || ''}`, 
-      odo: e.odometer, 
-      cost: e.cost
-  }));
+  const mEntries = (currentVehicle.maintenanceEntries || []).map(e => {
+      let d = e.maintType;
+      const extras = [];
+      if (e.garage) extras.push(`Taller: ${e.garage}`);
+      if (e.notes) extras.push(`Notas: ${e.notes}`);
+      if (extras.length > 0) d += ` - ${extras.join(' | ')}`;
+      return {
+          date: e.date,
+          type: e.groupId ? 'Rev. Múltiple' : 'Mantenimiento', 
+          desc: d, 
+          odo: e.odometer, 
+          cost: e.cost,
+          ticket: e.ticket
+      };
+  });
 
-  const history = [...fEntries, ...mEntries].sort((a,b) => new Date(b.date) - new Date(a.date));
+  const tEntries = (currentVehicle.taxEntries || []).map(e => {
+      return {
+          date: e.date,
+          type: e.taxType || 'Trámite',
+          desc: e.notes ? `Notas: ${e.notes}` : '',
+          odo: e.odometer || 0,
+          cost: e.cost || 0,
+          ticket: e.ticket
+      };
+  });
+
+  const history = [...fEntries, ...mEntries, ...tEntries].sort((a,b) => new Date(b.date) - new Date(a.date));
 
   const tableBody = history.map(h => [
       h.date,
@@ -1518,7 +2006,10 @@ async function exportVehiclePDF() {
   });
 
   // --- ATTACHMENTS (Tickets) ---
-  const ticketEntries = (currentVehicle.maintenanceEntries||[]).filter(m => m.ticket);
+  const maintTickets = (currentVehicle.maintenanceEntries||[]).filter(m => m.ticket);
+  const taxTickets = (currentVehicle.taxEntries||[]).filter(t => t.ticket).map(t => ({...t, maintType: t.taxType, garage: 'Trámite/Impuesto'}));
+  
+  const ticketEntries = [...maintTickets, ...taxTickets].sort((a,b) => new Date(b.date) - new Date(a.date));
   
   if(ticketEntries.length > 0) {
       // Process serially to maintain order and pdf structure

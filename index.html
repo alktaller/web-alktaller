@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>AlkTaller</title>
   <link rel="icon" href="images/icono.png">
+  <link rel="apple-touch-icon" href="/icono.png">
   <link rel="stylesheet" href="css/style.css?v=2">
   <style>
     /* Critical Internal CSS to prevent FOUC / Cache issues */
@@ -131,6 +132,10 @@
             </div>
 
             <div>
+              <label>Km de Compra (Iniciales)</label>
+              <input id="infoOdoInitial" type="number" placeholder="Ej: 80000" onchange="updateVehicleInfo('initialOdometer', this.value)">
+            </div>
+            <div>
               <label>Matrícula</label>
               <input id="infoPlate" type="text" placeholder="0000 XXX" onchange="updateVehicleInfo('plate', this.value)">
             </div>
@@ -177,8 +182,12 @@
             </div>
           </div>
           <div class="form-group mt-2">
-             <label>Notas</label>
-             <textarea id="infoNotes" style="width:100%; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px;" rows="2" placeholder="Notas adicionales..." onchange="updateVehicleInfo('notes', this.value)"></textarea>
+             <label>Información Extra</label>
+             <div id="dynamicNotesContainer" style="display:flex; flex-direction:column; gap:5px; margin-bottom:10px;"></div>
+             <div style="display:flex; gap:5px;">
+                 <input type="text" id="newDynamicNote" placeholder="Nueva línea de información..." style="flex:1;">
+                 <button onclick="addDynamicNote()" class="btn-success" style="padding:0 15px;">+</button>
+             </div>
           </div>
           
           <div class="form-group mt-2" style="text-align: right;">
@@ -231,8 +240,8 @@
                 
                 <input id="maintOdo" type="number" placeholder="Kilómetros">
                 <input id="maintCost" type="number" placeholder="Coste (€)">
-                
-                <input id="maintGarage" type="text" placeholder="Notas / Taller (¿Dónde se realizó?)">
+                <input id="maintGarage" type="text" placeholder="Taller">
+                <textarea id="maintNotes" placeholder="Notas adicionales..." style="width:100%; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px; margin-top:5px;" rows="2"></textarea>
                 <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
                     <label style="font-size:0.9rem; color:var(--text-color);">🧾 Ticket:</label>
                     <input id="maintTicket" type="file" accept="image/*" style="flex:1;">
@@ -240,7 +249,65 @@
 
                 <button onclick="addMaintenance()" class="btn-primary" style="margin-top:10px;">
                     <svg class="icon" viewBox="0 0 24 24" style="stroke:white"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v13a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                    Guardar mantenimiento
+                    Guardar mantenimiento individual
+                </button>
+              </div>
+            </section>
+
+            <section class="card" style="border-top: 4px solid var(--primary-color);">
+              <h2 style="color: var(--primary-color);">
+                <svg class="icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                Nueva Revisión (Grupo)
+              </h2>
+              <p style="font-size:0.85rem; color:#64748b; margin-top:-5px; margin-bottom:10px;">
+                Crea una revisión agrupando varios servicios bajo un único ticket y coste común.
+              </p>
+              <div class="form-group">
+                <input id="revDate" type="date">
+                <div id="revServicesContainer" style="max-height:150px; overflow-y:auto; border:1px solid var(--border-color); padding:10px; border-radius:6px; background:#f8fafc; font-size:0.9rem; margin-top:5px; margin-bottom:5px;"></div>
+                <input id="revOdo" type="number" placeholder="Kilómetros" style="margin-bottom:5px;">
+                <input id="revCost" type="number" placeholder="Coste Total (€)" style="margin-bottom:5px;">
+                <input id="revGarage" type="text" placeholder="Taller / Centro de servicio" style="margin-bottom:5px;">
+                <textarea id="revNotes" placeholder="Notas sobre la revisión..." style="width:100%; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px; margin-bottom:5px;" rows="2"></textarea>
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
+                    <label style="font-size:0.9rem; color:var(--text-color);">🧾 Ticket/Factura: </label>
+                    <input id="revTicket" type="file" accept="image/*" style="flex:1;">
+                </div>
+                <button onclick="addRevision()" class="btn-primary" style="margin-top:10px; background-color: var(--primary-color);">
+                    <svg class="icon" viewBox="0 0 24 24" style="stroke:white"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v13a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    Guardar Revisión Completa
+                </button>
+              </div>
+            </section>
+
+            <section class="card" style="border-top: 4px solid #10B981;">
+              <h2 style="color: #10B981;">
+                <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                Nuevo Impuesto / Trámite
+              </h2>
+              <p style="font-size:0.85rem; color:#64748b; margin-top:-5px; margin-bottom:10px;">
+                Registra ITV, seguros, multas e impuestos.
+              </p>
+              <div class="form-group">
+                <input id="taxDate" type="date">
+                <select id="taxType" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 5px;">
+                    <option value="" disabled selected>Seleccione Trámite...</option>
+                    <option value="ITV">ITV</option>
+                    <option value="Numerito">Numerito (Impuesto Circulación)</option>
+                    <option value="Seguro">Seguro</option>
+                    <option value="Multas">Multas</option>
+                    <option value="Otros">Otros</option>
+                </select>
+                <input id="taxOdo" type="number" placeholder="Kilómetros" style="margin-bottom:5px;">
+                <input id="taxCost" type="number" placeholder="Coste Total (€)" style="margin-bottom:5px;">
+                <textarea id="taxNotes" placeholder="Notas adicionales..." style="width:100%; padding:0.5rem; border:1px solid var(--border-color); border-radius:4px; margin-bottom:5px;" rows="2"></textarea>
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
+                    <label style="font-size:0.9rem; color:var(--text-color);">🧾 Documento/Ticket: </label>
+                    <input id="taxTicket" type="file" accept="image/*,application/pdf" style="flex:1;">
+                </div>
+                <button onclick="addTax()" class="btn-primary" style="margin-top:10px; background-color: #10B981;">
+                    <svg class="icon" viewBox="0 0 24 24" style="stroke:white"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v13a2 2 0 0 1-2 2z"></path></svg>
+                    Guardar Trámite
                 </button>
               </div>
             </section>
